@@ -46,6 +46,10 @@ class ProductCreate(BaseModel):
     serving_size: ServingSizeResponse | None = None
     servings_per_container: float | None = Field(default=None, ge=0)
     ingredients: list[IngredientResponse] = Field(default_factory=list)
+    seo_title: str | None = Field(default=None, max_length=70)
+    seo_description: str | None = Field(default=None, max_length=180)
+    seo_keywords: list[str] = Field(default_factory=list, max_length=12)
+    tags: list[str] = Field(default_factory=list, max_length=12)
 
 
 class ProductUpdate(BaseModel):
@@ -63,6 +67,10 @@ class ProductUpdate(BaseModel):
     serving_size: ServingSizeResponse | None = None
     servings_per_container: float | None = Field(default=None, ge=0)
     ingredients: list[IngredientResponse] | None = None
+    seo_title: str | None = Field(default=None, max_length=70)
+    seo_description: str | None = Field(default=None, max_length=180)
+    seo_keywords: list[str] | None = Field(default=None, max_length=12)
+    tags: list[str] | None = Field(default=None, max_length=12)
 
 
 class ProductStockUpdate(BaseModel):
@@ -96,6 +104,12 @@ class ProductResponse(BaseModel):
     servings_per_container: float | None = None
     source: ProductSourceResponse | None = None
     ingredients: list[IngredientResponse] = Field(default_factory=list)
+    seo_title: str | None = None
+    seo_description: str | None = None
+    seo_keywords: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+    ai_model: str | None = None
+    ai_generated_at: datetime | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
 

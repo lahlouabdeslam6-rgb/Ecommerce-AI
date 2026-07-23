@@ -34,6 +34,55 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:8-alpine
+    container_name: ecommerce_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_HOST_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:v1.15.4
+    container_name: ecommerce_qdrant
+    restart: unless-stopped
+    ports:
+      - "${QDRANT_HTTP_HOST_PORT:-6333}:6333"
+      - "${QDRANT_GRPC_HOST_PORT:-6334}:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "bash -c ':> /dev/tcp/127.0.0.1/6333'"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ecommerce_ollama
+    restart: unless-stopped
+    ports:
+      - "${OLLAMA_HOST_PORT:-11435}:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 10s
+
   backend:
     build:
       context: ./backend
@@ -49,6 +98,12 @@ services:
       - product_images:/app/app/static/uploads/products
     depends_on:
       mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      ollama:
         condition: service_healthy
     healthcheck:
       test:
@@ -81,3 +136,6 @@ volumes:
   mongo_data:
   sqlite_data:
   product_images:
+  redis_data:
+  qdrant_data:
+  ollama_data:

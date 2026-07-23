@@ -29,6 +29,12 @@ export type Product = {
   form_type: string | null;
   ingredients: Ingredient[];
   serving_size?: { count?: number; unit?: string };
+  seo_title?: string | null;
+  seo_description?: string | null;
+  seo_keywords?: string[];
+  tags?: string[];
+  ai_model?: string | null;
+  ai_generated_at?: string | null;
 };
 
 export type ProductList = {

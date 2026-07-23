@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from typing import Annotated, AsyncIterator
 
+import asyncio
 import logging
 from time import perf_counter
 from uuid import uuid4
@@ -11,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api.admin import router as admin_router
+from app.api.ai import router as ai_router
 from app.api.auth import router as auth_router
 from app.api.cart import router as cart_router
 from app.api.orders import router as orders_router
@@ -23,6 +25,13 @@ from app.core.rate_limit import rate_limiter
 from app.core.security import require_roles
 from app.models.user import User
 from app.db.mongodb import check_mongodb, connect_mongodb, disconnect_mongodb
+from app.db.ai_infrastructure import (
+    check_ollama,
+    check_qdrant,
+    check_redis,
+    connect_ai_infrastructure,
+    disconnect_ai_infrastructure,
+)
 from app.db.sqlite import check_sqlite, disconnect_sqlite, initialize_sqlite
 from app.repositories.product import ProductRepository
 
@@ -30,12 +39,14 @@ from app.repositories.product import ProductRepository
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     await connect_mongodb()
+    await connect_ai_infrastructure()
     await initialize_sqlite()
     await ProductRepository().ensure_indexes()
     try:
         yield
     finally:
         await disconnect_mongodb()
+        await disconnect_ai_infrastructure()
         await disconnect_sqlite()
 
 
@@ -108,6 +119,7 @@ async def security_and_observability(request: Request, call_next):
     return response
 
 app.include_router(products_router, prefix="/api")
+app.include_router(ai_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
 app.include_router(cart_router, prefix="/api")
 app.include_router(orders_router, prefix="/api")
@@ -140,6 +152,15 @@ async def health(response: Response) -> dict[str, object]:
         services["sqlite"] = "healthy" if await check_sqlite() else "unhealthy"
     except Exception:
         services["sqlite"] = "unhealthy"
+
+    ai_checks = await asyncio.gather(
+        check_redis(),
+        check_qdrant(),
+        check_ollama(),
+        return_exceptions=True,
+    )
+    for name, result in zip(("redis", "qdrant", "ollama"), ai_checks):
+        services[name] = "healthy" if result is True else "unhealthy"
 
     overall_status = (
         "healthy"

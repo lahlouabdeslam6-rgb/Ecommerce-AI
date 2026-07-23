@@ -15,6 +15,8 @@ type ProductForm = { name: string; brand: string; category: string; description:
 type SupportForm = { full_name: string; email: string; password: string; is_active: boolean };
 type AuditLog = { id: number; actor_id: number | null; actor_email: string | null; actor_role: string; action: string; entity_type: string; entity_id: string | null; details: string | null; created_at: string };
 type AuditLogList = { items: AuditLog[]; total: number };
+type ProductAISuggestion = { product_id: number; model: string; cached: boolean; description: string; category: string; seo_title: string; seo_description: string; seo_keywords: string[]; tags: string[] };
+type ProductAIApplyResponse = { product: Product; indexed: boolean };
 
 const emptyProduct: ProductForm = { name: "", brand: "", category: "", description: "", price: 0, stock: 0, currency: "MAD", is_active: true };
 const emptySupport: SupportForm = { full_name: "", email: "", password: "", is_active: true };
@@ -38,6 +40,9 @@ export default function AdminPage() {
   const [editingSupportId, setEditingSupportId] = useState<number | null>(null);
   const [supportForm, setSupportForm] = useState<SupportForm>(emptySupport);
   const [savingSupport, setSavingSupport] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState<ProductAISuggestion | null>(null);
+  const [generatingAI, setGeneratingAI] = useState(false);
+  const [applyingAI, setApplyingAI] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -66,6 +71,7 @@ export default function AdminPage() {
         setEditingId(product.product_id);
         setEditingProduct(product);
         setProductForm({ name: product.name || "", brand: product.brand || "", category: product.category || "", description: product.description || "", price: product.price || 0, stock: product.stock, currency: product.currency, is_active: product.is_active });
+        setAiSuggestion(null);
         setTab("product-editor");
       })
       .catch((err: Error) => setError(err.message));
@@ -75,6 +81,7 @@ export default function AdminPage() {
     setEditingId(product.product_id);
     setEditingProduct(product);
     setProductForm({ name: product.name || "", brand: product.brand || "", category: product.category || "", description: product.description || "", price: product.price || 0, stock: product.stock, currency: product.currency, is_active: product.is_active });
+    setAiSuggestion(null);
     setTab("product-editor");
   };
 
@@ -99,6 +106,63 @@ export default function AdminPage() {
     const form = new FormData(); form.append("image", file);
     try { const updated = await api<Product>(`/api/products/${editingId}/images`, { method: "POST", body: form }, true); setEditingProduct(updated); setMessage("Photo ajoutee."); await load(); }
     catch (err) { setError((err as Error).message); }
+  };
+
+  const generateProductSuggestion = async () => {
+    if (!editingId) return;
+    setError(""); setMessage(""); setGeneratingAI(true);
+    try {
+      const suggestion = await api<ProductAISuggestion>(
+        `/api/admin/ai/products/${editingId}/suggest`,
+        { method: "POST" },
+        true,
+      );
+      setAiSuggestion(suggestion);
+      setMessage(suggestion.cached ? "Proposition AI chargee depuis le cache." : "Proposition AI prete pour validation.");
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setGeneratingAI(false);
+    }
+  };
+
+  const applyProductSuggestion = async () => {
+    if (!editingId || !aiSuggestion) return;
+    setError(""); setMessage(""); setApplyingAI(true);
+    try {
+      const result = await api<ProductAIApplyResponse>(
+        `/api/admin/ai/products/${editingId}/apply`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            description: aiSuggestion.description,
+            category: aiSuggestion.category,
+            seo_title: aiSuggestion.seo_title,
+            seo_description: aiSuggestion.seo_description,
+            seo_keywords: aiSuggestion.seo_keywords,
+            tags: aiSuggestion.tags,
+          }),
+        },
+        true,
+      );
+      setEditingProduct(result.product);
+      setProductForm((current) => ({
+        ...current,
+        description: result.product.description || "",
+        category: result.product.category || "",
+      }));
+      setAiSuggestion(null);
+      setMessage(
+        result.indexed
+          ? "Proposition AI appliquee et produit indexe dans Qdrant."
+          : "Proposition AI appliquee. Indexation Qdrant a reessayer.",
+      );
+      await load();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setApplyingAI(false);
+    }
   };
 
   const updateOrder = async (id: number, orderStatus: string) => {
@@ -156,7 +220,7 @@ export default function AdminPage() {
 
     {tab === "products" && <><Title kicker="Catalogue" title="Produits" action={<button className="button button-small" onClick={() => { setEditingId(null); setProductForm(emptyProduct); setTab("product-editor"); }}>Ajouter un produit</button>} /><div className="data-table"><div className="table-row table-head"><span>Produit</span><span>Prix</span><span>Stock</span><span>Statut</span><span /></div>{products?.items.map((product) => <div className="table-row" key={product.product_id}><span><strong>{product.name}</strong><small>{product.brand}</small></span><span>{money(product.price || 0)}</span><span>{product.stock}</span><span><i className={product.is_active ? "dot active" : "dot"} />{product.is_active ? "Actif" : "Masque"}</span><span><button className="text-link" onClick={() => editProduct(product)}>Modifier</button></span></div>)}</div></>}
 
-    {tab === "product-editor" && <><Title kicker="Catalogue" title={editingId ? `Modifier #${editingId}` : "Nouveau produit"} action={<button className="text-link" onClick={() => setTab("products")}>Retour</button>} /><form className="panel product-editor" onSubmit={saveProduct}><div className="form-grid"><label>Nom<input value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} required /></label><label>Marque<input value={productForm.brand} onChange={(e) => setProductForm({ ...productForm, brand: e.target.value })} required /></label><label>Categorie<input value={productForm.category} onChange={(e) => setProductForm({ ...productForm, category: e.target.value })} /></label><label>Prix MAD<input type="number" step="0.01" min="0" value={productForm.price} onChange={(e) => setProductForm({ ...productForm, price: Number(e.target.value) })} required /></label><label>Stock<input type="number" min="0" value={productForm.stock} onChange={(e) => setProductForm({ ...productForm, stock: Number(e.target.value) })} required /></label><label className="check-filter"><input type="checkbox" checked={productForm.is_active} onChange={(e) => setProductForm({ ...productForm, is_active: e.target.checked })} /><span>Produit actif</span></label><label className="full-field">Description<textarea value={productForm.description} onChange={(e) => setProductForm({ ...productForm, description: e.target.value })} /></label>{editingId && <label className="full-field">Ajouter une photo<input type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadImage} /></label>}{editingProduct && editingId && <div className="full-field"><strong>Photos actuelles</strong><ProductImageManager product={editingProduct} onChange={setEditingProduct} onError={setError} /></div>}</div><div className="editor-actions"><button className="button">Enregistrer</button>{editingId && <button type="button" className="button button-danger" onClick={deleteProduct}>Supprimer</button>}</div></form></>}
+    {tab === "product-editor" && <><Title kicker="Catalogue" title={editingId ? `Modifier #${editingId}` : "Nouveau produit"} action={<button className="text-link" onClick={() => setTab("products")}>Retour</button>} /><form className="panel product-editor" onSubmit={saveProduct}><div className="form-grid"><label>Nom<input value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} required /></label><label>Marque<input value={productForm.brand} onChange={(e) => setProductForm({ ...productForm, brand: e.target.value })} required /></label><label>Categorie<input value={productForm.category} onChange={(e) => setProductForm({ ...productForm, category: e.target.value })} /></label><label>Prix MAD<input type="number" step="0.01" min="0" value={productForm.price} onChange={(e) => setProductForm({ ...productForm, price: Number(e.target.value) })} required /></label><label>Stock<input type="number" min="0" value={productForm.stock} onChange={(e) => setProductForm({ ...productForm, stock: Number(e.target.value) })} required /></label><label className="check-filter"><input type="checkbox" checked={productForm.is_active} onChange={(e) => setProductForm({ ...productForm, is_active: e.target.checked })} /><span>Produit actif</span></label><label className="full-field">Description<textarea value={productForm.description} onChange={(e) => setProductForm({ ...productForm, description: e.target.value })} /></label>{editingId && <div className="full-field ai-product-actions"><button type="button" className="button button-ai" onClick={generateProductSuggestion} disabled={generatingAI || applyingAI}>{generatingAI ? "Product Agent travaille..." : "Optimiser avec Product Agent"}</button><small>L'AI prepare une proposition. Aucune information ne change sans ta validation.</small></div>}{aiSuggestion && <section className="full-field ai-product-panel"><div className="ai-product-heading"><div><span>PRODUCT AGENT</span><strong>Proposition a valider</strong></div><small>{aiSuggestion.model}{aiSuggestion.cached ? " · cache" : ""}</small></div><div className="form-grid"><label>Categorie proposee<input value={aiSuggestion.category} onChange={(e) => setAiSuggestion((current) => current ? { ...current, category: e.target.value } : current)} /></label><label>Titre SEO<input value={aiSuggestion.seo_title} maxLength={70} onChange={(e) => setAiSuggestion((current) => current ? { ...current, seo_title: e.target.value } : current)} /></label><label className="full-field">Description produit<textarea value={aiSuggestion.description} maxLength={1500} onChange={(e) => setAiSuggestion((current) => current ? { ...current, description: e.target.value } : current)} /></label><label className="full-field">Description SEO<textarea value={aiSuggestion.seo_description} maxLength={180} onChange={(e) => setAiSuggestion((current) => current ? { ...current, seo_description: e.target.value } : current)} /></label><label>Mots-cles SEO<input value={aiSuggestion.seo_keywords.join(", ")} onChange={(e) => setAiSuggestion((current) => current ? { ...current, seo_keywords: splitTerms(e.target.value) } : current)} /></label><label>Tags<input value={aiSuggestion.tags.join(", ")} onChange={(e) => setAiSuggestion((current) => current ? { ...current, tags: splitTerms(e.target.value) } : current)} /></label></div><div className="ai-review-actions"><button type="button" className="button" onClick={applyProductSuggestion} disabled={applyingAI}>{applyingAI ? "Application..." : "Valider et appliquer"}</button><button type="button" className="text-link" onClick={() => setAiSuggestion(null)} disabled={applyingAI}>Ignorer</button></div></section>}{editingId && <label className="full-field">Ajouter une photo<input type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadImage} /></label>}{editingProduct && editingId && <div className="full-field"><strong>Photos actuelles</strong><ProductImageManager product={editingProduct} onChange={setEditingProduct} onError={setError} /></div>}</div><div className="editor-actions"><button className="button">Enregistrer</button>{editingId && <button type="button" className="button button-danger" onClick={deleteProduct}>Supprimer</button>}</div></form></>}
 
     {tab === "orders" && <><Title kicker="Operations" title="Commandes" />{!orders?.items.length ? <div className="empty-state"><h3>Aucune commande</h3></div> : <div className="data-table orders-table"><div className="table-row table-head"><span>No</span><span>Client</span><span>Total</span><span>Paiement</span><span>Statut</span></div>{orders.items.map((order) => <div className="table-row" key={order.id}><span>#{order.id}</span><span><strong>{order.full_name}</strong><small>{order.city} - {order.phone}</small></span><span>{money(order.total)}</span><span>{order.payment_status}</span><span><select value={order.order_status} onChange={(e) => updateOrder(order.id, e.target.value)}>{orderStatuses.map((status) => <option key={status}>{status}</option>)}</select></span></div>)}</div>}</>}
 
@@ -171,6 +235,7 @@ export default function AdminPage() {
 }
 
 function Title({ kicker, title, action }: { kicker: string; title: string; action?: React.ReactNode }) { return <div className="page-title"><div><p className="kicker">{kicker}</p><h2>{title}</h2></div>{action}</div>; }
+function splitTerms(value: string): string[] { return value.split(",").map((item) => item.trim()).filter(Boolean).slice(0, 12); }
 function AuditDetails({ value }: { value: string | null }) {
   if (!value) return <small>Aucun detail</small>;
   try {

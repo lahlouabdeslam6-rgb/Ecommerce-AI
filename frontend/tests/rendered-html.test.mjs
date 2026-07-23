@@ -129,3 +129,13 @@ test("admin roles are read-only and support accounts can be safely deleted", asy
   assert.match(adminSource, /Supprimer le compte/);
   assert.match(adminSource, /method: "DELETE"/);
 });
+
+test("admin reviews Product Agent content before applying it", async () => {
+  const adminSource = await readFile(new URL("../app/admin/page.tsx", import.meta.url), "utf8");
+  assert.match(adminSource, /Optimiser avec Product Agent/);
+  assert.match(adminSource, /Aucune information ne change sans ta validation/);
+  assert.match(adminSource, /Proposition a valider/);
+  assert.match(adminSource, /Valider et appliquer/);
+  assert.match(adminSource, /\/api\/admin\/ai\/products\/\$\{editingId\}\/suggest/);
+  assert.match(adminSource, /\/api\/admin\/ai\/products\/\$\{editingId\}\/apply/);
+});

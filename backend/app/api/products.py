@@ -28,6 +28,7 @@ from app.schemas.product import (
     ProductUpdate,
 )
 from app.services.product import ProductService
+from app.services.product_agent import ProductAgentService
 
 
 router = APIRouter(prefix="/products", tags=["Products"])
@@ -300,6 +301,7 @@ async def delete_product(
 ) -> Response:
     product = await product_service.get_product(product_id)
     await product_service.delete_product(product_id)
+    await ProductAgentService().remove_product_index(product_id)
     OperationsRepository(session).add_audit(
         actor_id=user.id,
         actor_role=user.role,

@@ -11,6 +11,12 @@ class Settings(BaseSettings):
     mongodb_url: str
     mongodb_database: str = "ecommerce_ai"
     sqlite_url: str = "sqlite+aiosqlite:///./data/ecommerce.db"
+    redis_url: str = "redis://redis:6379/0"
+    qdrant_url: str = "http://qdrant:6333"
+    qdrant_collection: str = "nutrifit_products"
+    ollama_url: str = "http://ollama:11434"
+    ollama_chat_model: str = "qwen2.5:3b"
+    ollama_embedding_model: str = "nomic-embed-text"
 
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"
