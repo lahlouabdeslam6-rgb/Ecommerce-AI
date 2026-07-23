@@ -16,6 +16,7 @@ from app.api.ai import router as ai_router
 from app.api.auth import router as auth_router
 from app.api.cart import router as cart_router
 from app.api.content import router as content_router
+from app.api.marketing import router as marketing_router
 from app.api.orders import router as orders_router
 from app.api.operations import router as operations_router
 from app.api.products import router as products_router
@@ -124,6 +125,7 @@ app.include_router(ai_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
 app.include_router(cart_router, prefix="/api")
 app.include_router(content_router, prefix="/api")
+app.include_router(marketing_router, prefix="/api")
 app.include_router(orders_router, prefix="/api")
 app.include_router(operations_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")

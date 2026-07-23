@@ -24,6 +24,8 @@ Le MVP local et l'infrastructure IA sont fonctionnels :
   tags, validation admin obligatoire et indexation Qdrant.
 - Content Agent avec generation de brouillons, edition admin, publication,
   archivage et affichage controle sur la homepage.
+- Marketing Agent avec campagnes multi-canaux, edition, validation admin et
+  archivage, sans envoi automatique ni modification des prix.
 
 Le paiement reel, l'envoi d'emails reel et les agents metier IA sont prevus
 dans les prochaines phases.
@@ -67,6 +69,10 @@ peut corriger puis valide la proposition.
 Le Content Agent est disponible dans `Administration > Contenu AI`. Les
 contenus restent en brouillon jusqu'a leur publication manuelle. Les types
 `homepage_hero` et `promotion` publies peuvent alimenter la page d'accueil.
+
+Le Marketing Agent est disponible dans `Administration > Marketing AI`. Il
+prepare des brouillons Instagram, Facebook, email et WhatsApp. Une validation
+admin marque la campagne comme prete, sans l'envoyer automatiquement.
 
 ## Tests
 

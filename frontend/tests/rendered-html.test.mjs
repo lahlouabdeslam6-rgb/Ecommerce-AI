@@ -188,3 +188,23 @@ test("admin has a client message inbox and role-aware notification links", async
   assert.match(inboxSource, /\/messages/);
   assert.match(bellSource, /\/admin\?tab=messages&ticket=/);
 });
+
+test("admin Marketing Agent keeps campaigns in a controlled approval flow", async () => {
+  const [adminSource, marketingSource] = await Promise.all([
+    readFile(new URL("../app/admin/page.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/admin/MarketingAgentWorkspace.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
+  assert.match(adminSource, /\["marketing", "Marketing AI"\]/);
+  assert.match(adminSource, /MarketingAgentWorkspace/);
+  assert.match(marketingSource, /Generer la campagne/);
+  assert.match(marketingSource, /Enregistrer brouillon/);
+  assert.match(marketingSource, /Valider la campagne/);
+  assert.match(marketingSource, /Aucun message n'a ete envoye automatiquement/);
+  assert.match(
+    marketingSource,
+    /\/api\/admin\/ai\/marketing\/campaigns\/\$\{draft\.id\}\/approve/,
+  );
+});
