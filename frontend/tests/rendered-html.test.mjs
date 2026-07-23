@@ -139,3 +139,52 @@ test("admin reviews Product Agent content before applying it", async () => {
   assert.match(adminSource, /\/api\/admin\/ai\/products\/\$\{editingId\}\/suggest/);
   assert.match(adminSource, /\/api\/admin\/ai\/products\/\$\{editingId\}\/apply/);
 });
+
+test("admin Content Agent uses draft review and controlled publishing", async () => {
+  const [adminSource, contentSource, homeSource] = await Promise.all([
+    readFile(new URL("../app/admin/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/admin/ContentAgentWorkspace.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(adminSource, /\["content", "Contenu AI"\]/);
+  assert.match(contentSource, /Validation admin obligatoire/);
+  assert.match(contentSource, /Generer le brouillon/);
+  assert.match(contentSource, /Enregistrer brouillon/);
+  assert.match(contentSource, /"Publier"/);
+  assert.match(contentSource, /\/api\/admin\/ai\/content\/\$\{draft\.id\}\/publish/);
+  assert.match(homeSource, /\/api\/content\/published\?content_type=homepage_hero/);
+  assert.match(homeSource, /\/api\/content\/published\?content_type=promotion/);
+});
+
+test("published promotions filter the matching catalogue segment", async () => {
+  const source = await readFile(
+    new URL("../app/page.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /applyPromotionFilter/);
+  assert.match(source, /setCategory\(mentionedCategory\)/);
+  assert.match(source, /setBrand\(mentionedBrand\)/);
+  assert.match(source, /setFlavor\(mentionedFlavor\)/);
+  assert.match(source, /Voir les produits/);
+  assert.match(source, /cleanPublishedText/);
+});
+
+test("admin has a client message inbox and role-aware notification links", async () => {
+  const [adminSource, inboxSource, bellSource] = await Promise.all([
+    readFile(new URL("../app/admin/page.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/admin/AdminTicketWorkspace.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/components/NotificationBell.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
+  assert.match(adminSource, /\["messages", "Messages clients"\]/);
+  assert.match(adminSource, /AdminTicketWorkspace/);
+  assert.match(inboxSource, /\/api\/support\/tickets\?page_size=100/);
+  assert.match(inboxSource, /Reponse admin envoyee au client/);
+  assert.match(inboxSource, /\/messages/);
+  assert.match(bellSource, /\/admin\?tab=messages&ticket=/);
+});

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useAuth } from "./AuthProvider";
 import { api } from "../lib/api";
 
 type Notification = {
@@ -14,6 +15,7 @@ type Notification = {
 };
 
 export function NotificationBell() {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<Notification[]>([]);
   const [unread, setUnread] = useState(0);
@@ -43,6 +45,16 @@ export function NotificationBell() {
       setUnread((value) => Math.max(0, value - 1));
     }
     setOpen(false);
+  };
+
+  const notificationLink = (item: Notification) => {
+    if (
+      user?.role === "admin" &&
+      item.link?.startsWith("/support?ticket=")
+    ) {
+      return item.link.replace("/support?ticket=", "/admin?tab=messages&ticket=");
+    }
+    return item.link;
   };
 
   return (
@@ -81,10 +93,11 @@ export function NotificationBell() {
           {items.length === 0 ? (
             <p>Aucune notification.</p>
           ) : (
-            items.slice(0, 8).map((item) =>
-              item.link ? (
+            items.slice(0, 8).map((item) => {
+              const link = notificationLink(item);
+              return link ? (
                 <Link
-                  href={item.link}
+                  href={link}
                   key={item.id}
                   className={item.is_read ? "" : "unread"}
                   onClick={() => markRead(item)}
@@ -100,8 +113,8 @@ export function NotificationBell() {
                 >
                   <b>{item.title}</b><span>{item.message}</span>
                 </button>
-              ),
-            )
+              );
+            })
           )}
         </div>
       )}

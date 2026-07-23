@@ -43,7 +43,7 @@ class SupportService:
                 notification_type="new_ticket",
                 title="Nouvelle demande client",
                 message=f"Ticket #{ticket.id}: {ticket.subject}",
-                link=f"/support?ticket={ticket.id}",
+                link=self._staff_ticket_link(role, ticket.id),
             )
         await self.session.commit()
         return TicketResponse.model_validate(ticket)
@@ -98,7 +98,7 @@ class SupportService:
                     notification_type="ticket_reply",
                     title="Reponse client",
                     message=f"Nouveau message sur le ticket #{ticket.id}",
-                    link=f"/support?ticket={ticket.id}",
+                    link=self._staff_ticket_link(role, ticket.id),
                 )
         else:
             self.operations.add_notification(
@@ -117,6 +117,12 @@ class SupportService:
         )
         await self.session.commit()
         return TicketResponse.model_validate(updated)
+
+    @staticmethod
+    def _staff_ticket_link(role: str, ticket_id: int) -> str:
+        if role == "admin":
+            return f"/admin?tab=messages&ticket={ticket_id}"
+        return f"/support?ticket={ticket_id}"
 
     async def set_status(
         self, ticket_id: int, value: str, actor: User | None = None

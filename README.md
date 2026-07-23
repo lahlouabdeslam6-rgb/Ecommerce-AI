@@ -22,6 +22,8 @@ Le MVP local et l'infrastructure IA sont fonctionnels :
 - health check et self-test admin de toute l'infrastructure IA.
 - Product Agent avec proposition controlee de description, categorie, SEO et
   tags, validation admin obligatoire et indexation Qdrant.
+- Content Agent avec generation de brouillons, edition admin, publication,
+  archivage et affichage controle sur la homepage.
 
 Le paiement reel, l'envoi d'emails reel et les agents metier IA sont prevus
 dans les prochaines phases.
@@ -61,6 +63,10 @@ la collection vectorielle et la generation locale.
 Le Product Agent est disponible dans la fiche de modification d'un produit.
 Il ne modifie jamais le catalogue automatiquement : l'admin genere, relit,
 peut corriger puis valide la proposition.
+
+Le Content Agent est disponible dans `Administration > Contenu AI`. Les
+contenus restent en brouillon jusqu'a leur publication manuelle. Les types
+`homepage_hero` et `promotion` publies peuvent alimenter la page d'accueil.
 
 ## Tests
 

@@ -8,6 +8,52 @@ import { SiteFooter } from "./components/SiteFooter";
 import { api } from "./lib/api";
 import type { ProductList } from "./types";
 
+type PublishedContent = {
+  id: number;
+  topic: string;
+  title: string;
+  subtitle: string | null;
+  body: string;
+  cta_label: string | null;
+  hashtags: string[];
+  content_type: string;
+};
+
+const PROMOTION_SEARCH_TERMS = [
+  "creatine",
+  "whey",
+  "protein",
+  "omega 3",
+  "multivitamin",
+  "vitamin",
+  "magnesium",
+  "zinc",
+  "bcaa",
+  "pre workout",
+  "collagen",
+];
+
+function normalizeText(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function cleanPublishedText(value: string): string {
+  return value
+    .replace(/<li[^>]*>/gi, "\n- ")
+    .replace(/<\/(?:p|div|li|ul|ol|h[1-6])>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export default function Home() {
   const [products, setProducts] = useState<ProductList | null>(null);
   const [filters, setFilters] = useState<{ brands: string[]; categories: string[]; flavors: string[] }>({ brands: [], categories: [], flavors: [] });
@@ -21,6 +67,8 @@ export default function Home() {
   const [sortBy, setSortBy] = useState("newest");
   const [page, setPage] = useState(1);
   const [error, setError] = useState("");
+  const [heroContent, setHeroContent] = useState<PublishedContent | null>(null);
+  const [promotion, setPromotion] = useState<PublishedContent | null>(null);
 
   const query = useMemo(() => {
     const params = new URLSearchParams({ page: String(page), page_size: "12" });
@@ -47,8 +95,50 @@ export default function Home() {
     setPage(1);
   };
 
+  const applyPromotionFilter = () => {
+    if (!promotion) return;
+    const promotionText = normalizeText([
+      promotion.topic,
+      promotion.title,
+      promotion.subtitle || "",
+      promotion.body,
+      ...(promotion.hashtags || []),
+    ].join(" "));
+    const mentionedCategory = filters.categories.find((item) =>
+      promotionText.includes(normalizeText(item)),
+    );
+    const mentionedBrand = filters.brands.find((item) =>
+      promotionText.includes(normalizeText(item)),
+    );
+    const mentionedFlavor = filters.flavors.find((item) =>
+      promotionText.includes(normalizeText(item)),
+    );
+
+    resetFilters();
+    if (mentionedCategory) {
+      setCategory(mentionedCategory);
+    } else if (mentionedBrand) {
+      setBrand(mentionedBrand);
+    } else if (mentionedFlavor) {
+      setFlavor(mentionedFlavor);
+    } else {
+      const searchTerm = PROMOTION_SEARCH_TERMS.find((term) =>
+        promotionText.includes(term),
+      );
+      setSearch(searchTerm || promotion.topic);
+    }
+    window.requestAnimationFrame(() => {
+      document.getElementById("catalogue")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  };
+
   useEffect(() => {
     api<{ brands: string[]; categories: string[]; flavors: string[] }>("/api/products/filters").then(setFilters).catch(() => undefined);
+    api<PublishedContent | null>("/api/content/published?content_type=homepage_hero").then(setHeroContent).catch(() => undefined);
+    api<PublishedContent | null>("/api/content/published?content_type=promotion").then(setPromotion).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -66,9 +156,9 @@ export default function Home() {
         <div className="hero-content shell">
           <div className="hero-copy">
             <p className="kicker">Nutrition &amp; Performance</p>
-            <h1>Fuel Your Body. Elevate Your Performance.</h1>
-            <p>Des compléments sélectionnés pour accompagner chaque objectif. Explorez 300 références et commandez avec paiement à la livraison.</p>
-            <a href="#catalogue" className="button hero-cta">Explorer les compléments</a>
+            <h1>{heroContent?.title || "Fuel Your Body. Elevate Your Performance."}</h1>
+            <p>{heroContent?.body || "Des compléments sélectionnés pour accompagner chaque objectif. Explorez 300 références et commandez avec paiement à la livraison."}</p>
+            <a href="#catalogue" className="button hero-cta">{heroContent?.cta_label || "Explorer les compléments"}</a>
             <div className="hero-trust">
               <span><strong>300</strong> produits</span>
               <span><strong>100%</strong> transparence</span>
@@ -77,6 +167,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {promotion && <section className="content-promotion shell"><div><p className="kicker">Selection NUTRIFIT</p><h2>{cleanPublishedText(promotion.title)}</h2>{promotion.subtitle && <strong>{cleanPublishedText(promotion.subtitle)}</strong>}<p>{cleanPublishedText(promotion.body)}</p></div><a href="#catalogue" className="button" onClick={applyPromotionFilter}>Voir les produits</a></section>}
 
       <section className="catalogue shell" id="catalogue">
         <div className="section-heading">
