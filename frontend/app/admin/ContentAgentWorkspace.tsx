@@ -203,8 +203,8 @@ export function ContentAgentWorkspace() {
         <span className="muted">{items.length} contenu(s)</span>
       </div>
       <div className="ai-safety-note">
-        <strong>Validation admin obligatoire</strong>
-        <span>L'AI cree uniquement un brouillon. Rien ne passe en ligne avant le bouton Publier.</span>
+        <strong>Validation admin + Safety AI</strong>
+        <span>L'AI cree uniquement un brouillon. Safety Agent le controle avant le bouton Publier.</span>
       </div>
       {message && <div className="alert alert-success">{message}</div>}
       {error && <div className="alert alert-error">{error}</div>}

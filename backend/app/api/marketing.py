@@ -14,6 +14,7 @@ from app.schemas.marketing import (
     MarketingGenerateRequest,
 )
 from app.services.marketing_agent import MarketingAgentService
+from app.services.safety_agent import SafetyAgentService
 
 
 router = APIRouter(prefix="/admin/ai/marketing", tags=["AI Marketing"])
@@ -97,7 +98,32 @@ async def approve_campaign(
     admin: Annotated[User, Depends(require_roles("admin"))],
     session: Annotated[AsyncSession, Depends(get_sqlite_session)],
 ) -> MarketingCampaignResponse:
-    campaign = await MarketingAgentService(session).approve(
+    service = MarketingAgentService(session)
+    draft = await service.get(campaign_id)
+    safety_text = "\n".join(
+        value
+        for value in (
+            draft.campaign_title,
+            draft.headline,
+            draft.core_message,
+            draft.email_subject,
+            draft.email_body,
+            draft.whatsapp_message,
+            draft.social_caption,
+            draft.cta_label,
+            " ".join(draft.hashtags),
+        )
+        if value
+    )
+    await SafetyAgentService(session).enforce(
+        safety_text,
+        source_type="marketing_campaign",
+        source_id=campaign_id,
+        action="marketing.approve",
+        actor_id=admin.id,
+        actor_role=admin.role,
+    )
+    campaign = await service.approve(
         campaign_id,
         approved_by=admin.id,
     )

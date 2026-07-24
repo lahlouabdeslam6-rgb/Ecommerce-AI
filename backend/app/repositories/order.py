@@ -95,6 +95,29 @@ class OrderRepository:
         )
         return list(result.scalars().all()), total
 
+    async def recent_product_ids(
+        self,
+        user_id: int,
+        *,
+        limit: int = 30,
+    ) -> list[int]:
+        result = await self.session.execute(
+            select(OrderItem.product_id)
+            .join(Order, Order.id == OrderItem.order_id)
+            .where(
+                Order.user_id == user_id,
+                Order.order_status != "cancelled",
+            )
+            .order_by(Order.created_at.desc(), OrderItem.id.desc())
+            .limit(limit)
+        )
+        product_ids: list[int] = []
+        for product_id in result.scalars().all():
+            value = int(product_id)
+            if value not in product_ids:
+                product_ids.append(value)
+        return product_ids
+
     async def dashboard_counts(self) -> dict[str, int | float]:
         total = int(
             (await self.session.execute(select(func.count(Order.id)))).scalar_one()

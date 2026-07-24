@@ -53,7 +53,7 @@ test("anonymous visitors can inspect products before sign-in", async () => {
 
   assert.match(cardSource, /const detailHref = productPath/);
   assert.match(cardSource, /const loginHref = `\/login\?returnTo=/);
-  assert.match(detailSource, /if \(!user\) return router\.push\(`\/login\?returnTo=/);
+  assert.match(detailSource, /if \(!user\)[\s\S]*router\.push\(`\/login\?returnTo=/);
   assert.doesNotMatch(detailSource, /router\.replace\(`\/login\?returnTo=/);
 });
 
@@ -147,7 +147,7 @@ test("admin Content Agent uses draft review and controlled publishing", async ()
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(adminSource, /\["content", "Contenu AI"\]/);
-  assert.match(contentSource, /Validation admin obligatoire/);
+  assert.match(contentSource, /Validation admin \+ Safety AI/);
   assert.match(contentSource, /Generer le brouillon/);
   assert.match(contentSource, /Enregistrer brouillon/);
   assert.match(contentSource, /"Publier"/);
@@ -207,4 +207,45 @@ test("admin Marketing Agent keeps campaigns in a controlled approval flow", asyn
     marketingSource,
     /\/api\/admin\/ai\/marketing\/campaigns\/\$\{draft\.id\}\/approve/,
   );
+});
+
+test("admin Safety Agent reviews text and exposes the control history", async () => {
+  const [adminSource, safetySource] = await Promise.all([
+    readFile(new URL("../app/admin/page.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/admin/SafetyAgentWorkspace.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
+  assert.match(adminSource, /\["safety", "Safety AI"\]/);
+  assert.match(adminSource, /SafetyAgentWorkspace/);
+  assert.match(safetySource, /Analyser avec Safety AI/);
+  assert.match(safetySource, /Historique des controles/);
+  assert.match(safetySource, /Protection nutrition et sante/);
+  assert.match(safetySource, /\/api\/admin\/ai\/safety\/review/);
+  assert.match(safetySource, /\/api\/admin\/ai\/safety\/reviews/);
+  assert.match(safetySource, /blocked: "Bloque"/);
+});
+
+test("Recommendation Agent appears on product detail and cart", async () => {
+  const [detailSource, cartSource, recommendationSource] = await Promise.all([
+    readFile(new URL("../app/products/[id]/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/cart/page.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/components/RecommendationSection.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
+  assert.match(detailSource, /RecommendationSection/);
+  assert.match(
+    detailSource,
+    /\/api\/recommendations\/products\/\$\{product\.product_id\}/,
+  );
+  assert.match(cartSource, /\/api\/recommendations\/cart/);
+  assert.match(cartSource, /authenticated/);
+  assert.match(cartSource, /interactive/);
+  assert.match(recommendationSource, /Recommendation Agent/);
+  assert.match(recommendationSource, /Budget max par produit/);
+  assert.match(recommendationSource, /Qdrant \+ catalogue/);
+  assert.match(recommendationSource, /result\.disclaimer/);
 });

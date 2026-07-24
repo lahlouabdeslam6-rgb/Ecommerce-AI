@@ -213,6 +213,29 @@ class ProductRepository:
         products = await cursor.to_list(length=len(product_ids))
         return {int(product["product_id"]): product for product in products}
 
+    async def recommendation_candidates(
+        self,
+        *,
+        exclude_ids: list[int],
+        max_price: float | None,
+        limit: int = 120,
+    ) -> list[dict[str, Any]]:
+        query: dict[str, Any] = {
+            "is_active": True,
+            "stock": {"$gt": 0},
+            "price": {"$ne": None},
+        }
+        if exclude_ids:
+            query["product_id"] = {"$nin": exclude_ids}
+        if max_price is not None:
+            query["price"] = {"$ne": None, "$lte": max_price}
+        cursor = (
+            self.collection.find(query, {"_id": 0})
+            .sort([("stock", -1), ("product_id", 1)])
+            .limit(limit)
+        )
+        return await cursor.to_list(length=limit)
+
     async def reserve_stock(self, product_id: int, quantity: int) -> bool:
         product = await self.collection.find_one_and_update(
             {

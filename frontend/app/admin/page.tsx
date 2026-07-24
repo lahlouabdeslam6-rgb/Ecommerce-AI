@@ -9,6 +9,7 @@ import { ProductImageManager } from "../components/ProductImageManager";
 import { ContentAgentWorkspace } from "./ContentAgentWorkspace";
 import { AdminTicketWorkspace } from "./AdminTicketWorkspace";
 import { MarketingAgentWorkspace } from "./MarketingAgentWorkspace";
+import { SafetyAgentWorkspace } from "./SafetyAgentWorkspace";
 import { api, money } from "../lib/api";
 import type { PaginatedOrders, Product, ProductList, User } from "../types";
 
@@ -223,7 +224,7 @@ export default function AdminPage() {
     }
   };
 
-  return <Protected admin><section className="admin-shell"><aside className="admin-sidebar"><p className="kicker">Administration</p><h1>Pilotage</h1>{[["dashboard", "Vue d'ensemble"], ["products", "Produits"], ["content", "Contenu AI"], ["marketing", "Marketing AI"], ["orders", "Commandes"], ["messages", "Messages clients"], ["support-users", "Equipe support"], ["users", "Utilisateurs"], ["audit", "Historique"]].map(([value, label]) => <button key={value} className={tab === value || (value === "support-users" && tab === "support-editor") ? "active" : ""} onClick={() => setTab(value)}>{label}</button>)}</aside><div className="admin-content">{message && <div className="alert alert-success">{message}</div>}{error && <div className="alert alert-error">{error}</div>}
+  return <Protected admin><section className="admin-shell"><aside className="admin-sidebar"><p className="kicker">Administration</p><h1>Pilotage</h1>{[["dashboard", "Vue d'ensemble"], ["products", "Produits"], ["content", "Contenu AI"], ["marketing", "Marketing AI"], ["safety", "Safety AI"], ["orders", "Commandes"], ["messages", "Messages clients"], ["support-users", "Equipe support"], ["users", "Utilisateurs"], ["audit", "Historique"]].map(([value, label]) => <button key={value} className={tab === value || (value === "support-users" && tab === "support-editor") ? "active" : ""} onClick={() => setTab(value)}>{label}</button>)}</aside><div className="admin-content">{message && <div className="alert alert-success">{message}</div>}{error && <div className="alert alert-error">{error}</div>}
 
     {tab === "dashboard" && <><Title kicker="Aujourd'hui" title="Vue d'ensemble" />{dashboard ? <div className="stats-grid"><Stat label="Produits" value={dashboard.products} /><Stat label="Produits actifs" value={dashboard.active_products} /><Stat label="Stock faible" value={dashboard.low_stock_products} accent /><Stat label="Utilisateurs" value={dashboard.users} /><Stat label="Equipe support" value={supportUsers?.total || 0} /><Stat label="Commandes" value={dashboard.orders} /><Stat label="En attente" value={dashboard.pending_orders} accent /><Stat label="Revenu COD" value={money(dashboard.revenue_mad)} /></div> : <div className="page-loading">Chargement...</div>}</>}
 
@@ -234,6 +235,8 @@ export default function AdminPage() {
     {tab === "content" && <ContentAgentWorkspace />}
 
     {tab === "marketing" && <MarketingAgentWorkspace />}
+
+    {tab === "safety" && <SafetyAgentWorkspace />}
 
     {tab === "orders" && <><Title kicker="Operations" title="Commandes" />{!orders?.items.length ? <div className="empty-state"><h3>Aucune commande</h3></div> : <div className="data-table orders-table"><div className="table-row table-head"><span>No</span><span>Client</span><span>Total</span><span>Paiement</span><span>Statut</span></div>{orders.items.map((order) => <div className="table-row" key={order.id}><span>#{order.id}</span><span><strong>{order.full_name}</strong><small>{order.city} - {order.phone}</small></span><span>{money(order.total)}</span><span>{order.payment_status}</span><span><select value={order.order_status} onChange={(e) => updateOrder(order.id, e.target.value)}>{orderStatuses.map((status) => <option key={status}>{status}</option>)}</select></span></div>)}</div>}</>}
 

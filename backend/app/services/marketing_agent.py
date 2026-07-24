@@ -183,6 +183,10 @@ class MarketingAgentService:
         updated = await self.repository.update(campaign, values)
         return MarketingCampaignResponse.model_validate(updated)
 
+    async def get(self, campaign_id: int) -> MarketingCampaignResponse:
+        campaign = await self._get_or_404(campaign_id)
+        return MarketingCampaignResponse.model_validate(campaign)
+
     async def approve(
         self,
         campaign_id: int,

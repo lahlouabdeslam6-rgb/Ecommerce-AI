@@ -14,6 +14,7 @@ from app.schemas.content import (
     ContentUpdate,
 )
 from app.services.content_agent import ContentAgentService
+from app.services.safety_agent import SafetyAgentService
 
 
 router = APIRouter(tags=["AI Content"])
@@ -106,7 +107,28 @@ async def publish_content(
     admin: Annotated[User, Depends(require_roles("admin"))],
     session: Annotated[AsyncSession, Depends(get_sqlite_session)],
 ) -> ContentResponse:
-    result = await ContentAgentService(session).publish(content_id)
+    service = ContentAgentService(session)
+    content = await service.get(content_id)
+    safety_text = "\n".join(
+        value
+        for value in (
+            content.title,
+            content.subtitle,
+            content.body,
+            content.cta_label,
+            " ".join(content.hashtags),
+        )
+        if value
+    )
+    await SafetyAgentService(session).enforce(
+        safety_text,
+        source_type="content",
+        source_id=content_id,
+        action="content.publish",
+        actor_id=admin.id,
+        actor_role=admin.role,
+    )
+    result = await service.publish(content_id)
     OperationsRepository(session).add_audit(
         actor_id=admin.id,
         actor_role=admin.role,

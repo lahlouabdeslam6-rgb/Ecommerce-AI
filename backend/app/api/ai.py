@@ -16,6 +16,7 @@ from app.schemas.ai import (
 )
 from app.services.ai_infrastructure import AIInfrastructureService
 from app.services.product_agent import ProductAgentService
+from app.services.safety_agent import SafetyAgentService
 
 
 router = APIRouter(prefix="/admin/ai", tags=["AI Infrastructure"])
@@ -67,6 +68,23 @@ async def apply_product_content(
     user: Annotated[User, Depends(require_roles("admin"))],
     session: Annotated[AsyncSession, Depends(get_sqlite_session)],
 ) -> ProductAIApplyResponse:
+    safety_text = "\n".join(
+        [
+            suggestion.description,
+            suggestion.seo_title,
+            suggestion.seo_description,
+            " ".join(suggestion.seo_keywords),
+            " ".join(suggestion.tags),
+        ]
+    )
+    await SafetyAgentService(session).enforce(
+        safety_text,
+        source_type="product_suggestion",
+        source_id=product_id,
+        action="product.apply",
+        actor_id=user.id,
+        actor_role=user.role,
+    )
     result = await ProductAgentService().apply(product_id, suggestion)
     OperationsRepository(session).add_audit(
         actor_id=user.id,

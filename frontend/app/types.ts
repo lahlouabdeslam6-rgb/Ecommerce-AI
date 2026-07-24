@@ -45,6 +45,20 @@ export type ProductList = {
   total_pages: number;
 };
 
+export type RecommendationItem = {
+  product: Product;
+  score: number;
+  reasons: string[];
+};
+
+export type RecommendationResponse = {
+  context: "product" | "cart";
+  strategy: "semantic+catalogue" | "catalogue";
+  personalized: boolean;
+  items: RecommendationItem[];
+  disclaimer: string;
+};
+
 export type CartItem = {
   product_id: number;
   name: string;

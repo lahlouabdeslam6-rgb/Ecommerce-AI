@@ -255,10 +255,10 @@ export function MarketingAgentWorkspace() {
         <span className="muted">{items.length} campagne(s)</span>
       </div>
       <div className="ai-safety-note">
-        <strong>Validation admin obligatoire</strong>
+        <strong>Validation admin + Safety AI</strong>
         <span>
-          L&apos;AI prepare les textes. Elle ne change aucun prix et
-          n&apos;envoie aucun email, WhatsApp ou post automatiquement.
+          L&apos;AI prepare les textes. Safety Agent les controle avant
+          validation, et aucun message n&apos;est envoye automatiquement.
         </span>
       </div>
       {message && <div className="alert alert-success">{message}</div>}

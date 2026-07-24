@@ -26,6 +26,11 @@ Le MVP local et l'infrastructure IA sont fonctionnels :
   archivage et affichage controle sur la homepage.
 - Marketing Agent avec campagnes multi-canaux, edition, validation admin et
   archivage, sans envoi automatique ni modification des prix.
+- Safety Agent avec controle par regles et Ollama, historique admin et blocage
+  des promesses medicales avant application ou publication d'un contenu AI.
+- Recommendation Agent avec suggestions similaires sur les fiches produits,
+  personnalisation par panier, commandes, objectif et budget, Qdrant avec
+  fallback MongoDB, uniquement sur les produits actifs et disponibles.
 
 Le paiement reel, l'envoi d'emails reel et les agents metier IA sont prevus
 dans les prochaines phases.
@@ -73,6 +78,15 @@ contenus restent en brouillon jusqu'a leur publication manuelle. Les types
 Le Marketing Agent est disponible dans `Administration > Marketing AI`. Il
 prepare des brouillons Instagram, Facebook, email et WhatsApp. Une validation
 admin marque la campagne comme prete, sans l'envoyer automatiquement.
+
+Le Safety Agent est disponible dans `Administration > Safety AI`. Il controle
+automatiquement Product Agent, Content Agent et Marketing Agent au moment de
+la validation. Un contenu conforme passe, un doute est trace pour review et
+une promesse medicale dangereuse bloque l'action avant toute modification.
+
+Le Recommendation Agent apparait sous les fiches produits et dans le panier.
+Il classe les produits disponibles avec Qdrant et les donnees du catalogue. Le
+client connecte peut aussi choisir un objectif et un budget maximum par produit.
 
 ## Tests
 
