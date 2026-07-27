@@ -35,9 +35,28 @@ function Invoke-FrontendWithRetry {
     }
 }
 
+function Invoke-ApiWithRetry {
+    param(
+        [string]$Uri,
+        [int]$Attempts = 20
+    )
+
+    for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
+        try {
+            return Invoke-RestMethod -Uri $Uri -Method Get -TimeoutSec 10
+        }
+        catch {
+            if ($attempt -eq $Attempts) {
+                throw
+            }
+            Start-Sleep -Seconds 1
+        }
+    }
+}
+
 Write-Host "NUTRIFIT - controle rapide"
 
-$health = Invoke-RestMethod -Uri "$BackendUrl/health" -Method Get
+$health = Invoke-ApiWithRetry -Uri "$BackendUrl/health"
 Assert-True ($health.status -eq "healthy") "Le backend n'est pas healthy."
 Assert-True ($health.services.mongodb -eq "healthy") "MongoDB n'est pas healthy."
 Assert-True ($health.services.sqlite -eq "healthy") "SQLite n'est pas healthy."
