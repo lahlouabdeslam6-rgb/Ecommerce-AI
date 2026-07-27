@@ -15,11 +15,11 @@ type RecommendationSectionProps = {
 
 const objectives = [
   ["", "Tous les objectifs"],
-  ["proteines", "Proteines"],
+  ["proteines", "Protéines"],
   ["prise de masse", "Prise de masse"],
-  ["energie", "Energie"],
-  ["recuperation", "Recuperation"],
-  ["bien-etre", "Bien-etre"],
+  ["energie", "Énergie"],
+  ["recuperation", "Récupération"],
+  ["bien-etre", "Bien-être"],
 ];
 
 export function RecommendationSection({
@@ -119,7 +119,7 @@ export function RecommendationSection({
 
       {error ? (
         <div className="recommendation-empty">
-          Recommendations temporairement indisponibles.
+          Recommandations temporairement indisponibles.
         </div>
       ) : loading ? (
         <div className="recommendation-loading">
@@ -145,7 +145,7 @@ export function RecommendationSection({
         </>
       ) : (
         <div className="recommendation-empty">
-          Ma l9inach produits disponibles kaynasbo had les criteres.
+          Aucun produit disponible ne correspond à ces critères.
         </div>
       )}
     </section>

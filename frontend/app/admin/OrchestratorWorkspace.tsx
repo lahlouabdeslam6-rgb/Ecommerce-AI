@@ -11,15 +11,15 @@ import { OrchestratorResult } from "../components/OrchestratorResult";
 
 const examples = [
   {
-    message: "Bghit creatine ta7t 300 MAD w kayna f stock",
+    message: "Je cherche de la créatine à moins de 300 MAD en stock",
     taskType: "",
   },
   {
-    message: "Kteb description premium 3la whey protein",
+    message: "Rédige une description premium pour une whey protein",
     taskType: "content",
   },
   {
-    message: "Prepare campagne promotion creatine pour Instagram et email",
+    message: "Prépare une campagne de promotion pour la créatine sur Instagram et par email",
     taskType: "marketing",
   },
 ];
@@ -65,7 +65,7 @@ export function OrchestratorWorkspace() {
     event.preventDefault();
     if (!message.trim()) return;
     if (taskType === "product" && (!productId || Number(productId) < 1)) {
-      setError("Product Agent khaso ID produit s7i7.");
+      setError("Le Product Agent nécessite un identifiant de produit valide.");
       return;
     }
     setLoading(true);
@@ -105,10 +105,10 @@ export function OrchestratorWorkspace() {
     <section className="orchestrator-workspace">
       <div className="page-title">
         <div><p className="kicker">Cerveau central</p><h2>AI Orchestrator</h2></div>
-        <span className="ai-readonly-badge">Preview + Safety</span>
+        <span className="ai-readonly-badge">Prévisualisation + Safety</span>
       </div>
       <p className="section-intro">
-        Teste un talab, chof achmen agents khdmo, w ra9eb Safety. Hna ma kayn la publication la modification automatique.
+        Testez une demande, identifiez les agents mobilisés et consultez le contrôle Safety. Aucune publication ni modification automatique ne sera effectuée.
       </p>
       {error && <div className="alert alert-error">{error}</div>}
 
@@ -116,26 +116,26 @@ export function OrchestratorWorkspace() {
         <div className="panel orchestrator-console">
           <form onSubmit={submit}>
             <label>
-              <span>Talab</span>
+              <span>Demande</span>
               <textarea
                 value={message}
                 onChange={(event) => setMessage(event.target.value)}
                 maxLength={500}
-                placeholder="Ex: kteb contenu premium 3la creatine"
+                placeholder="Ex. : rédiger un contenu premium sur la créatine"
                 required
               />
             </label>
             <label>
-              <span>Routing</span>
+              <span>Sélection des agents</span>
               <select value={taskType} onChange={(event) => setTaskType(event.target.value)}>
-                <option value="">Automatique (recommande)</option>
+                <option value="">Automatique (recommandé)</option>
                 <option value="product">Product Agent</option>
                 <option value="recommendation">Recommendation Agent</option>
                 <option value="content">Content Agent</option>
                 <option value="marketing">Marketing Agent</option>
               </select>
               <small>
-                Khalli Automatique bach Orchestrator ykhtar agent li monasib.
+                Laissez le mode automatique pour que l&apos;Orchestrator sélectionne l&apos;agent adapté.
               </small>
             </label>
             {taskType === "product" && (
@@ -167,7 +167,7 @@ export function OrchestratorWorkspace() {
               ))}
             </div>
             <button className="button" disabled={loading || !message.trim()}>
-              {loading ? "Orchestrator kaykhdem..." : "Lancer l'analyse"}
+              {loading ? "Analyse en cours..." : "Lancer l'analyse"}
             </button>
           </form>
         </div>
@@ -176,27 +176,27 @@ export function OrchestratorWorkspace() {
           {response ? (
             <>
               <div className="alert alert-success">
-                Resultat wajed: {response.selected_agents.join(" + ")}
+                Résultat prêt : {response.selected_agents.join(" + ")}
               </div>
               <OrchestratorResult response={response} />
             </>
           ) : (
             <div className="panel ai-empty-state">
               <span>N</span>
-              <h3>Resultat dyal agents</h3>
-              <p>Dir talab bach tchof routing, outputs w Safety decision.</p>
+              <h3>Résultat des agents</h3>
+              <p>Saisissez une demande pour consulter le routage, les résultats et la décision Safety.</p>
             </div>
           )}
         </div>
       </div>
 
       <div className="page-title orchestrator-history-title">
-        <div><p className="kicker">Tracabilite</p><h2>Historique Orchestrator</h2></div>
-        <span>{history?.total || 0} requete(s)</span>
+        <div><p className="kicker">Traçabilité</p><h2>Historique Orchestrator</h2></div>
+        <span>{history?.total || 0} requête(s)</span>
       </div>
       <div className="orchestrator-history-layout">
         <div className="data-table orchestrator-history-table">
-          <div className="table-row table-head"><span>Date</span><span>Acteur</span><span>Talab</span><span>Agents</span><span /></div>
+          <div className="table-row table-head"><span>Date</span><span>Acteur</span><span>Demande</span><span>Agents</span><span /></div>
           {history?.items.map((item) => (
             <button className="table-row" key={item.id} onClick={() => setSelected(item)}>
               <span>{new Date(item.created_at).toLocaleString("fr-MA")}</span>

@@ -14,9 +14,9 @@ type ConversationItem = {
 };
 
 const quickPrompts = [
-  "Bghit creatine ta7t 300 MAD w kayna f stock",
-  "9ter7 lia produit l recuperation",
-  "Bghit proteine 3la 7sab budget dyali",
+  "Je cherche de la créatine à moins de 300 MAD en stock",
+  "Recommande-moi un produit pour la récupération",
+  "Je cherche une protéine adaptée à mon budget",
 ];
 
 export function AIShoppingAssistant() {
@@ -57,14 +57,14 @@ export function AIShoppingAssistant() {
           <header>
             <div>
               <span className="brand-mark assistant-mark">N</span>
-              <div><strong>Assistant NUTRIFIT</strong><small>Product + Recommendation + Safety</small></div>
+              <div><strong>Assistant NUTRIFIT</strong><small>Produit + Recommandation + Sécurité</small></div>
             </div>
             <button type="button" className="ai-close" onClick={() => setOpen(false)} aria-label="Fermer">×</button>
           </header>
           <div className="ai-assistant-thread">
             {conversation.length === 0 && (
               <div className="ai-welcome">
-                <p>Sewelni 3la produit, objectif wela budget dyalk.</p>
+                <p>Posez-moi une question sur un produit, un objectif ou votre budget.</p>
                 <div>{quickPrompts.map((prompt) => (
                   <button key={prompt} type="button" onClick={() => setMessage(prompt)}>{prompt}</button>
                 ))}</div>
@@ -75,22 +75,22 @@ export function AIShoppingAssistant() {
                 <p className="ai-user-message">{item.message}</p>
                 {item.response && <OrchestratorResult response={item.response} compact />}
                 {item.error && <div className="alert alert-error">{item.error}</div>}
-                {!item.response && !item.error && <div className="ai-thinking">Les agents kaykhdmo...</div>}
+                {!item.response && !item.error && <div className="ai-thinking">Les agents analysent votre demande...</div>}
               </div>
             ))}
           </div>
           <form onSubmit={submit} className="ai-assistant-form">
-            <label htmlFor="assistant-message">Talab dyalk</label>
+            <label htmlFor="assistant-message">Votre demande</label>
             <div>
               <input
                 id="assistant-message"
                 value={message}
                 onChange={(event) => setMessage(event.target.value)}
                 maxLength={500}
-                placeholder="Ex: bghit creatine ta7t 300 MAD"
+                placeholder="Ex. : créatine à moins de 300 MAD"
               />
               <button className="button button-small" disabled={sending || !message.trim()}>
-                {sending ? "..." : "Sift"}
+                {sending ? "..." : "Envoyer"}
               </button>
             </div>
           </form>
@@ -104,7 +104,7 @@ export function AIShoppingAssistant() {
         aria-label="Ouvrir Assistant NUTRIFIT"
       >
         <span>N</span>
-        <b>AI Assistant</b>
+        <b>Assistant IA</b>
       </button>
     </div>
   );

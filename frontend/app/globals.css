@@ -424,6 +424,9 @@ input:disabled { color:#817c75; background:#1b1a1d; }
 .ai-recommendation-item>div:first-child { display:grid; gap:3px; }
 .ai-recommendation-item small { color:#91897f; }
 .ai-recommendation-meta { display:flex; align-items:center; gap:12px; color:#dec17b; }
+.ai-recommendation-link { color:inherit; text-decoration:none; transition:background .2s ease, box-shadow .2s ease, transform .2s ease; }
+.ai-recommendation-link:hover { background:rgba(222,193,123,.08); box-shadow:inset 3px 0 0 #dec17b; transform:translateX(2px); }
+.ai-recommendation-link:focus-visible { outline:2px solid #dec17b; outline-offset:-2px; }
 .ai-safety-result { padding:14px; }
 .ai-safety-result>div { display:flex; align-items:center; gap:8px; }
 .ai-safety-result ul { margin:10px 0 0; padding-left:20px; color:#aaa198; }

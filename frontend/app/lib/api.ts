@@ -66,7 +66,7 @@ export async function api<T>(
   }
   if (authenticated) {
     const token = getToken();
-    if (!token) throw new Error("Khassek tconnecta lwel");
+    if (!token) throw new Error("Vous devez vous connecter.");
     headers.set("Authorization", `Bearer ${token}`);
   }
 
@@ -94,12 +94,12 @@ export async function api<T>(
       setTokens(null, null);
       const returnTo = window.location.pathname;
       window.location.assign(`/login?expired=1&returnTo=${encodeURIComponent(returnTo)}`);
-      throw new Error("Votre session a expire. Reconnectez-vous.");
+      throw new Error("Votre session a expiré. Reconnectez-vous.");
     }
     const detail = data?.detail;
     const message = Array.isArray(detail)
       ? detail.map((item: { msg?: string }) => item.msg).join(", ")
-      : detail || "Wa9e3 mochkil, 3awed jreb";
+      : detail || "Une erreur est survenue. Veuillez réessayer.";
     throw new Error(message);
   }
   return data as T;

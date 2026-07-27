@@ -265,10 +265,12 @@ test("customer AI assistant routes requests through the Orchestrator", async () 
   assert.match(layoutSource, /AIShoppingAssistant/);
   assert.match(assistantSource, /user\?\.role !== "customer"/);
   assert.match(assistantSource, /\/api\/orchestrator\/execute/);
-  assert.match(assistantSource, /Bghit creatine ta7t 300 MAD/);
+  assert.match(assistantSource, /Je cherche de la créatine à moins de 300 MAD/);
   assert.match(resultSource, /Recommendation Agent/);
   assert.match(resultSource, /Safety Agent/);
   assert.match(resultSource, /\/products\/\$\{productId\}/);
+  assert.match(resultSource, /ai-recommendation-item ai-recommendation-link/);
+  assert.match(resultSource, /Voir le produit/);
 });
 
 test("admin AI Orchestrator exposes routing, safety and persistent history", async () => {
@@ -284,10 +286,10 @@ test("admin AI Orchestrator exposes routing, safety and persistent history", asy
   assert.match(workspaceSource, /\/api\/orchestrator\/execute/);
   assert.match(workspaceSource, /\/api\/orchestrator\/history\?page_size=40/);
   assert.match(workspaceSource, /Historique Orchestrator/);
-  assert.match(workspaceSource, /Preview \+ Safety/);
+  assert.match(workspaceSource, /Prévisualisation \+ Safety/);
   assert.match(workspaceSource, /actor_email/);
-  assert.match(workspaceSource, /Automatique \(recommande\)/);
+  assert.match(workspaceSource, /Automatique \(recommandé\)/);
   assert.match(workspaceSource, /setTaskType\(example\.taskType\)/);
-  assert.match(workspaceSource, /Product Agent khaso ID produit s7i7/);
-  assert.match(workspaceSource, /Resultat wajed/);
+  assert.match(workspaceSource, /Le Product Agent nécessite un identifiant de produit valide/);
+  assert.match(workspaceSource, /Résultat prêt/);
 });
