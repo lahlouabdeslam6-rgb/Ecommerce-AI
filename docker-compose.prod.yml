@@ -1,0 +1,48 @@
+services:
+  mongo:
+    ports: !reset []
+
+  redis:
+    ports: !reset []
+
+  qdrant:
+    ports: !reset []
+
+  ollama:
+    ports: !reset []
+
+  backend:
+    ports: !reset []
+    environment:
+      ENVIRONMENT: production
+      CORS_ORIGINS: '["${PUBLIC_APP_URL:-http://localhost}"]'
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        NEXT_PUBLIC_API_URL: same-origin
+    ports: !reset []
+
+  n8n:
+    ports: !reset []
+    environment:
+      N8N_HOST: ${N8N_PUBLIC_HOST:-localhost}
+      N8N_PROTOCOL: ${N8N_PROTOCOL:-https}
+      WEBHOOK_URL: ${N8N_WEBHOOK_URL:-https://localhost/n8n/}
+
+  gateway:
+    image: nginx:1.29-alpine
+    container_name: ecommerce_gateway
+    restart: unless-stopped
+    ports:
+      - "${PUBLIC_HTTP_PORT:-80}:80"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+

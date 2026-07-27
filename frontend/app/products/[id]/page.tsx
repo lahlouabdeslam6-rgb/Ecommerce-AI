@@ -64,7 +64,7 @@ export default function ProductDetailPage() {
       <section className="shell page-section product-detail">
         <div className="detail-visual">
           {image ? (
-            <img src={image} alt={product.name || "Produit"} />
+            <img src={image} alt={product.image_alt || product.name || "Produit"} />
           ) : (
             <div className="detail-placeholder">
               <span>{(product.category || "S")[0].toUpperCase()}</span>
@@ -141,6 +141,17 @@ export default function ProductDetailPage() {
               <p>Aucune information disponible.</p>
             )}
           </div>
+          {!!product.seo_faq?.length && (
+            <div className="ingredients-panel product-faq">
+              <h2>Questions fréquentes</h2>
+              {product.seo_faq.map((item) => (
+                <details key={item.question}>
+                  <summary>{item.question}</summary>
+                  <p>{item.answer}</p>
+                </details>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

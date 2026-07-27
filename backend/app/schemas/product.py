@@ -50,6 +50,13 @@ class ProductCreate(BaseModel):
     seo_description: str | None = Field(default=None, max_length=180)
     seo_keywords: list[str] = Field(default_factory=list, max_length=12)
     tags: list[str] = Field(default_factory=list, max_length=12)
+    slug: str | None = Field(
+        default=None,
+        pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        max_length=180,
+    )
+    image_alt: str | None = Field(default=None, max_length=180)
+    seo_faq: list[dict[str, str]] = Field(default_factory=list, max_length=5)
 
 
 class ProductUpdate(BaseModel):
@@ -71,6 +78,13 @@ class ProductUpdate(BaseModel):
     seo_description: str | None = Field(default=None, max_length=180)
     seo_keywords: list[str] | None = Field(default=None, max_length=12)
     tags: list[str] | None = Field(default=None, max_length=12)
+    slug: str | None = Field(
+        default=None,
+        pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        max_length=180,
+    )
+    image_alt: str | None = Field(default=None, max_length=180)
+    seo_faq: list[dict[str, str]] | None = Field(default=None, max_length=5)
 
 
 class ProductStockUpdate(BaseModel):
@@ -108,6 +122,9 @@ class ProductResponse(BaseModel):
     seo_description: str | None = None
     seo_keywords: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
+    slug: str | None = None
+    image_alt: str | None = None
+    seo_faq: list[dict[str, str]] = Field(default_factory=list)
     ai_model: str | None = None
     ai_generated_at: datetime | None = None
     created_at: datetime | None = None

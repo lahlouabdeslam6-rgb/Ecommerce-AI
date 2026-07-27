@@ -15,10 +15,13 @@ from app.api.admin import router as admin_router
 from app.api.analytics import router as analytics_router
 from app.api.ai import router as ai_router
 from app.api.auth import router as auth_router
+from app.api.automations import router as automations_router
 from app.api.cart import router as cart_router
 from app.api.content import router as content_router
+from app.api.delivery import router as delivery_router
 from app.api.marketing import router as marketing_router
 from app.api.safety import router as safety_router
+from app.api.seo import router as seo_router
 from app.api.orders import router as orders_router
 from app.api.operations import router as operations_router
 from app.api.products import router as products_router
@@ -130,10 +133,13 @@ app.include_router(products_router, prefix="/api")
 app.include_router(recommendations_router, prefix="/api")
 app.include_router(ai_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
+app.include_router(automations_router, prefix="/api")
 app.include_router(cart_router, prefix="/api")
 app.include_router(content_router, prefix="/api")
+app.include_router(delivery_router, prefix="/api")
 app.include_router(marketing_router, prefix="/api")
 app.include_router(safety_router, prefix="/api")
+app.include_router(seo_router, prefix="/api")
 app.include_router(orders_router, prefix="/api")
 app.include_router(operations_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")

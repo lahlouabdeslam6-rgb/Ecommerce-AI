@@ -83,6 +83,45 @@ services:
       retries: 20
       start_period: 10s
 
+  n8n:
+    image: n8nio/n8n:2.31.7
+    container_name: ecommerce_n8n
+    restart: unless-stopped
+    environment:
+      N8N_HOST: localhost
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-local-n8n-key-change-me}
+      N8N_USER_MANAGEMENT_DISABLED: "false"
+      N8N_UNVERIFIED_PACKAGES_ENABLED: "false"
+      N8N_RUNNERS_TASK_TIMEOUT: "60"
+      N8N_COMPRESSION_NODE_MAX_DECOMPRESSED_SIZE_BYTES: "268435456"
+      N8N_COMPRESSION_NODE_MAX_ZIP_ENTRIES: "1000"
+      GENERIC_TIMEZONE: Africa/Casablanca
+      TZ: Africa/Casablanca
+      AUTOMATION_API_KEY: ${AUTOMATION_API_KEY:-local-automation-key-change-me}
+    ports:
+      - "${N8N_HOST_PORT:-5678}:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./docker/n8n/workflows:/workflows:ro
+    entrypoint: ["/bin/sh", "/workflows/entrypoint.sh"]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:5678/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    depends_on:
+      backend:
+        condition: service_healthy
+
   backend:
     build:
       context: ./backend
@@ -139,3 +178,4 @@ volumes:
   redis_data:
   qdrant_data:
   ollama_data:
+  n8n_data:

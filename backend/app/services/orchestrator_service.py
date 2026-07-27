@@ -25,6 +25,8 @@ from app.services.content_agent import ContentAgentService
 from app.services.marketing_agent import MarketingAgentService
 from app.services.analytics_agent import AnalyticsAgentService
 from app.services.stock_forecast_agent import StockForecastAgentService
+from app.services.delivery_agent import DeliveryAgentService
+from app.services.seo_agent import SEOAgentService
 from app.services.support_agent import SupportAgentService
 from app.schemas.content import ContentGenerateRequest
 from app.schemas.marketing import MarketingGenerateRequest
@@ -96,6 +98,14 @@ _INTENT_KEYWORDS: dict[str, set[str]] = {
         "forecast", "prevision", "rupture", "reapprovisionnement",
         "approvisionnement", "epuisement",
     },
+    "delivery": {
+        "delivery", "livraisons", "expedition", "expeditions",
+        "transporteur", "retards", "retardees",
+    },
+    "seo": {
+        "seo", "referencement", "meta", "slug", "keywords",
+        "mots-cles", "google",
+    },
 }
 
 
@@ -135,11 +145,7 @@ def _extract_objective(text: str) -> str | None:
 
 
 class OrchestratorService:
-    """Routes requests to Product and Recommendation agents.
-
-    This Step-1 implementation handles read-only orchestration.
-    Mutation requests are flagged but never executed.
-    """
+    """Coordonne les agents NUTRIFIT sans mutation automatique."""
 
     def __init__(
         self,
@@ -165,11 +171,19 @@ class OrchestratorService:
         )
 
         # 2. Admin Check for Content/Marketing
-        if intent in ("content", "marketing", "analytics", "stock_forecast"):
+        if intent in (
+            "content",
+            "marketing",
+            "analytics",
+            "stock_forecast",
+            "delivery",
+            "seo",
+        ):
             if self.user is None or self.user.role != "admin":
                 raise HTTPException(
                     status.HTTP_403_FORBIDDEN,
-                    "Les agents Content, Marketing, Analytics et Stock Forecast sont réservés aux administrateurs.",
+                    "Les agents Content, Marketing, Analytics, Stock Forecast, "
+                    "Delivery et SEO sont réservés aux administrateurs.",
                 )
 
         proposed_action = (
@@ -187,8 +201,8 @@ class OrchestratorService:
                         agent=intent,
                         status="blocked",
                         data={
-                            "reason": "Mutation requests are proposal-only "
-                            "in this version. No data was modified."
+                            "reason": "Cette action reste une proposition. "
+                            "Aucune donnée n'a été modifiée."
                         },
                     )
                 ],
@@ -221,18 +235,26 @@ class OrchestratorService:
                 ctx,
                 request.message,
             )
+        elif intent == "delivery":
+            results, agents = await self._handle_delivery()
+        elif intent == "seo":
+            results, agents = await self._handle_seo(ctx)
         else:
             # Compound: product + recommendation
             results, agents = await self._handle_compound(
                 ctx, message_normalised
             )
 
-        # Support Agent already applies its own safety rules. Running the
-        # Orchestrator safety pass again can hide a valid order answer when
-        # Ollama is unavailable, so it is intentionally skipped for support.
+        # Operational reports do not need a second generative safety pass.
         safety_result = (
             None
-            if intent == "support"
+            if intent in {
+                "support",
+                "analytics",
+                "stock_forecast",
+                "delivery",
+                "seo",
+            }
             else await self._run_safety(request.message, results)
         )
         if safety_result is not None:
@@ -242,8 +264,8 @@ class OrchestratorService:
             if safety_status in {"warning", "blocked"}:
                 requires_confirmation = True
                 proposed_action = (
-                    "A human safety review is required before this AI result "
-                    "can be used."
+                    "Une vérification humaine Safety est requise avant "
+                    "d'utiliser ce résultat AI."
                 )
 
         return OrchestratorResponse(
@@ -266,7 +288,20 @@ class OrchestratorService:
         if explicit is not None:
             return explicit.value
 
+        normalised = _normalize(normalised)
         tokens = set(re.findall(r"[a-z0-9]+", normalised))
+
+        seo_hits = tokens & _INTENT_KEYWORDS["seo"]
+        if seo_hits:
+            return "seo"
+
+        delivery_hits = tokens & _INTENT_KEYWORDS["delivery"]
+        delivery_analysis = tokens & {
+            "analyse", "analyser", "risque", "risques", "retards",
+            "retardees", "operations", "surveiller",
+        }
+        if delivery_hits and delivery_analysis:
+            return "delivery"
 
         support_hits = tokens & _INTENT_KEYWORDS["support"]
         if support_hits:
@@ -323,8 +358,9 @@ class OrchestratorService:
     @staticmethod
     def _describe_mutation(raw_message: str) -> str:
         return (
-            f"The request appears to modify data: \"{raw_message[:200]}\". "
-            "This action is proposal-only and was not executed."
+            f"Cette demande semble modifier des données : "
+            f"« {raw_message[:200]} ». Elle reste une proposition et "
+            "n'a pas été exécutée."
         )
 
     # ------------------------------------------------------------------
@@ -341,8 +377,8 @@ class OrchestratorService:
                         agent="product",
                         status="skipped",
                         data={
-                            "reason": "product_id is required in context "
-                            "for the Product Agent."
+                            "reason": "Le champ product_id est requis dans "
+                            "le contexte du Product Agent."
                         },
                     )
                 ],
@@ -415,6 +451,74 @@ class OrchestratorService:
                     },
                 )
             ], ["support"]
+
+    async def _handle_delivery(
+        self,
+    ) -> tuple[list[AgentResult], list[str]]:
+        if self.session is None:
+            return [
+                AgentResult(
+                    agent="delivery",
+                    status="error",
+                    data={"error": "Une session est requise."},
+                )
+            ], ["delivery"]
+        try:
+            report = await DeliveryAgentService(self.session).report(
+                notify=False,
+            )
+            return [
+                AgentResult(
+                    agent="delivery",
+                    status="success",
+                    data=report.model_dump(mode="json"),
+                )
+            ], ["delivery"]
+        except Exception as exc:
+            logger.warning("DeliveryAgent report error: %s", exc)
+            return [
+                AgentResult(
+                    agent="delivery",
+                    status="error",
+                    data={"error": str(exc)},
+                )
+            ], ["delivery"]
+
+    async def _handle_seo(
+        self,
+        ctx: OrchestratorContext,
+    ) -> tuple[list[AgentResult], list[str]]:
+        if self.session is None:
+            return [
+                AgentResult(
+                    agent="seo",
+                    status="error",
+                    data={"error": "Une session est requise."},
+                )
+            ], ["seo"]
+        try:
+            service = SEOAgentService(self.session)
+            result = (
+                await service.preview(ctx.product_id)
+                if ctx.product_id is not None
+                else await service.audit()
+            )
+            return [
+                AgentResult(
+                    agent="seo",
+                    status="success",
+                    data=result.model_dump(mode="json"),
+                )
+            ], ["seo"]
+        except Exception as exc:
+            logger.warning("SEOAgent error: %s", exc)
+            return [
+                AgentResult(
+                    agent="seo",
+                    status="error",
+                    data={"error": str(exc)},
+                )
+            ], ["seo"]
 
     async def _handle_compound(
         self,
@@ -600,7 +704,7 @@ class OrchestratorService:
                 data={
                     "status": "warning",
                     "risk_level": "medium",
-                    "error": "Safety Agent timed out; human review is required.",
+                    "error": "Safety Agent a expiré ; une vérification humaine est requise.",
                 },
             )
         except Exception as exc:
@@ -611,7 +715,7 @@ class OrchestratorService:
                 data={
                     "status": "warning",
                     "risk_level": "medium",
-                    "error": "Safety Agent unavailable; human review is required.",
+                    "error": "Safety Agent est indisponible ; une vérification humaine est requise.",
                 },
             )
 

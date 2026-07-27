@@ -38,7 +38,7 @@ export function ProductCard({ product }: { product: Product }) {
     <article className="product-card">
       <Link href={detailHref} className="product-visual">
         {image ? (
-          <img src={image} alt={product.name || "Produit"} />
+          <img src={image} alt={product.image_alt || product.name || "Produit"} />
         ) : (
           <div className="product-placeholder" aria-hidden="true">
             <span>{(product.category || "S").slice(0, 1).toUpperCase()}</span>

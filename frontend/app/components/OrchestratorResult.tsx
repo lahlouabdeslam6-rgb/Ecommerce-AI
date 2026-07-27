@@ -14,6 +14,8 @@ const agentLabels: Record<string, string> = {
   safety: "Safety Agent",
   analytics: "Analytics Agent",
   stock_forecast: "Stock Forecast Agent",
+  delivery: "Delivery Agent",
+  seo: "SEO Agent",
 };
 
 const intentLabels: Record<string, string> = {
@@ -25,6 +27,8 @@ const intentLabels: Record<string, string> = {
   compound: "Produit et recommandation",
   analytics: "Analyse des ventes",
   stock_forecast: "Prévision du stock",
+  delivery: "Suivi des livraisons",
+  seo: "Référencement SEO",
 };
 
 const statusLabels: Record<string, string> = {

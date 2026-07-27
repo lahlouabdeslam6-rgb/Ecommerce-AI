@@ -1,0 +1,152 @@
+{
+  "id": "nutrifit-outbox-dispatch",
+  "name": "NUTRIFIT - Email and WhatsApp outbox",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "nodes": [
+    {
+      "id": "schedule-outbox",
+      "name": "Toutes les 5 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "get-outbox",
+      "name": "Lire les messages en attente",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 0],
+      "parameters": {
+        "url": "http://backend:8000/api/automations/outbox?limit=50",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Automation-Key",
+              "value": "={{ $env.AUTOMATION_API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "splitIntoItems": true
+        }
+      }
+    },
+    {
+      "id": "route-channel",
+      "name": "Router par canal",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [520, 0],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.channel }}",
+                    "rightValue": "email",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Email"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.channel }}",
+                    "rightValue": "whatsapp",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "WhatsApp"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "email-placeholder",
+      "name": "Configurer SMTP puis activer",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [790, -100],
+      "parameters": {}
+    },
+    {
+      "id": "whatsapp-placeholder",
+      "name": "Configurer WhatsApp Cloud puis activer",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [790, 100],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "Toutes les 5 minutes": {
+      "main": [
+        [
+          {
+            "node": "Lire les messages en attente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lire les messages en attente": {
+      "main": [
+        [
+          {
+            "node": "Router par canal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Router par canal": {
+      "main": [
+        [
+          {
+            "node": "Configurer SMTP puis activer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Configurer WhatsApp Cloud puis activer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

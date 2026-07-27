@@ -353,3 +353,35 @@ test("admin Stock Forecast Agent explains stock risks with simple graphs", async
   assert.match(orchestratorSource, /Stock Forecast Agent/);
   assert.match(orchestratorSource, /Prévois les risques de rupture de stock/);
 });
+
+test("admin Delivery Agent monitors delays and controls notifications", async () => {
+  const [adminSource, deliverySource, orchestratorSource] = await Promise.all([
+    readFile(new URL("../app/admin/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/admin/DeliveryAgentWorkspace.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/admin/OrchestratorWorkspace.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(adminSource, /\["delivery", "Livraisons AI"\]/);
+  assert.match(adminSource, /DeliveryAgentWorkspace/);
+  assert.match(deliverySource, /\/api\/admin\/ai\/delivery\/report/);
+  assert.match(deliverySource, /\/api\/admin\/ai\/delivery\/scan/);
+  assert.match(deliverySource, /Analyser et notifier/);
+  assert.match(deliverySource, /ne sont pas répétées pendant 24 heures/);
+  assert.match(orchestratorSource, /Delivery Agent/);
+});
+
+test("admin SEO Agent audits and applies controlled product metadata", async () => {
+  const [adminSource, seoSource, detailSource, cardSource] = await Promise.all([
+    readFile(new URL("../app/admin/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/admin/SEOAgentWorkspace.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/products/[id]/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/ProductCard.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(adminSource, /\["seo", "SEO AI"\]/);
+  assert.match(adminSource, /SEOAgentWorkspace/);
+  assert.match(seoSource, /\/api\/admin\/ai\/seo\/audit/);
+  assert.match(seoSource, /Valider et appliquer/);
+  assert.match(seoSource, /Aucune proposition n&apos;est appliquée sans validation/);
+  assert.match(detailSource, /Questions fréquentes/);
+  assert.match(detailSource, /product\.image_alt/);
+  assert.match(cardSource, /product\.image_alt/);
+});

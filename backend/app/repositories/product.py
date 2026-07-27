@@ -39,6 +39,7 @@ class ProductRepository:
         await self.collection.create_index("category")
         await self.collection.create_index("is_active")
         await self.collection.create_index("ingredients.name")
+        await self.collection.create_index("slug")
 
         latest_product = await self.collection.find_one(
             {},

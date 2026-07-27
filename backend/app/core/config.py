@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     ollama_url: str = "http://ollama:11434"
     ollama_chat_model: str = "qwen2.5:3b"
     ollama_embedding_model: str = "nomic-embed-text"
+    automation_api_key: str = "local-automation-key-change-me"
 
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"

@@ -18,6 +18,8 @@ class OrchestratorTaskType(str, Enum):
     marketing = "marketing"
     analytics = "analytics"
     stock_forecast = "stock_forecast"
+    delivery = "delivery"
+    seo = "seo"
 
 
 ALLOWED_CONTEXT_KEYS = {

@@ -429,9 +429,12 @@ class TestMutationProposalOnly:
 
         assert response.requires_confirmation is True
         assert response.proposed_action is not None
-        assert "proposal-only" in response.proposed_action
+        assert "proposition" in response.proposed_action
+        assert "pas été exécutée" in response.proposed_action
         assert response.results[0].status == "blocked"
-        assert "no data was modified" in response.results[0].data["reason"].lower()
+        assert "aucune donnée n'a été modifiée" in (
+            response.results[0].data["reason"].lower()
+        )
 
     @pytest.mark.asyncio
     async def test_mutation_with_confirm_still_blocked(self) -> None:

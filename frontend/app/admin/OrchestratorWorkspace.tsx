@@ -34,6 +34,14 @@ const examples = [
     message: "Comment fonctionne le paiement à la livraison ?",
     taskType: "support",
   },
+  {
+    message: "Analyse les risques et retards de livraison",
+    taskType: "delivery",
+  },
+  {
+    message: "Lance un audit SEO du catalogue",
+    taskType: "seo",
+  },
 ];
 
 export function OrchestratorWorkspace() {
@@ -148,6 +156,8 @@ export function OrchestratorWorkspace() {
                 <option value="marketing">Marketing Agent</option>
                 <option value="analytics">Analytics Agent</option>
                 <option value="stock_forecast">Stock Forecast Agent</option>
+                <option value="delivery">Delivery Agent</option>
+                <option value="seo">SEO Agent</option>
               </select>
               <small>
                 Laissez le mode automatique pour que l&apos;Orchestrator sélectionne l&apos;agent adapté.

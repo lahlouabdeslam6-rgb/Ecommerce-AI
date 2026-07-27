@@ -33,6 +33,9 @@ export type Product = {
   seo_description?: string | null;
   seo_keywords?: string[];
   tags?: string[];
+  slug?: string | null;
+  image_alt?: string | null;
+  seo_faq?: { question: string; answer: string }[];
   ai_model?: string | null;
   ai_generated_at?: string | null;
 };

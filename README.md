@@ -37,16 +37,27 @@ Le MVP local et l'infrastructure IA sont fonctionnels :
 - Stock Forecast Agent avec vitesse de vente, jours de couverture, date de
   rupture estimee, priorites et quantites de reapprovisionnement suggerees,
   sans modification automatique du catalogue.
+- Delivery Agent avec surveillance des commandes actives, estimation interne
+  de livraison, detection des retards, alertes client/support/admin et
+  protection contre les notifications en double.
+- SEO Agent avec audit du catalogue, score par produit, proposition de titre,
+  meta description, mots-cles, slug, texte alternatif et FAQ. L'application
+  d'une proposition reste une action admin controlee par Safety.
 - Support Agent avec reponses sur les produits, le paiement, la livraison,
   les retours et le statut des commandes du client connecte. Les demandes
   sensibles sont bloquees et les cas non resolus passent au support humain.
 - AI Orchestrator avec detection d'intention en francais, anglais et darija
   latine, coordination Product, Recommendation, Content, Marketing, Analytics
-  Stock Forecast, Support et Safety, assistant client et espace de supervision
-  admin avec historique.
+  Stock Forecast, Delivery, SEO, Support et Safety, assistant client et espace
+  de supervision admin avec historique.
+- n8n avec workflows de surveillance des livraisons, relance des paniers
+  abandonnes et outbox email/WhatsApp. Les messages externes restent en attente
+  tant que les credentials SMTP et WhatsApp ne sont pas configures.
+- configuration Docker de production avec frontend optimise, reverse proxy
+  Nginx, reseau interne pour les services et controle des secrets.
 
-Le paiement reel, l'envoi d'emails reel et l'agent Delivery sont prevus dans
-les prochaines phases.
+Le paiement reel reste volontairement hors de cette phase. L'envoi externe
+d'emails et de messages WhatsApp demande les credentials des fournisseurs.
 
 ## Demarrage local
 
@@ -75,6 +86,7 @@ docker compose exec ollama ollama pull nomic-embed-text
 - Redis depuis Windows : `localhost:6379`
 - Qdrant dashboard : http://localhost:6333/dashboard
 - Ollama depuis Windows : http://localhost:11435
+- n8n : http://localhost:5678
 
 Les routes admin `GET /api/admin/ai/status` et `POST /api/admin/ai/test`
 permettent de verifier les services, les modeles, le cache, les embeddings,
@@ -112,6 +124,16 @@ intelligent`. La route admin `GET /api/admin/ai/stock-forecast/report` calcule
 les risques de rupture a partir du stock MongoDB et des ventes SQLite. Ollama
 peut rediger une analyse, mais aucune quantite n'est appliquee automatiquement.
 
+Le Delivery Agent est disponible dans `Administration > Livraisons AI`.
+`GET /api/admin/ai/delivery/report` produit un rapport en lecture seule.
+`POST /api/admin/ai/delivery/scan` cree les alertes utiles et alimente l'outbox
+email/WhatsApp. Une meme commande n'est pas notifiee deux fois dans les
+24 heures.
+
+Le SEO Agent est disponible dans `Administration > SEO AI`. Il audite tout le
+catalogue, genere une proposition editable et ne l'applique qu'apres validation
+explicite de l'admin et controle Safety.
+
 Le Support Agent est integre a l'assistant flottant du client et disponible
 directement avec `POST /api/support/ai/chat`. Il lit uniquement les commandes
 du client connecte, le catalogue actif et les regles du site. Une question
@@ -129,6 +151,12 @@ decision Safety. `GET /api/orchestrator/history` est reserve a l'admin et
 retourne l'historique trace dans les audit logs. Les actions de modification,
 publication et envoi restent en mode proposition : aucune action metier n'est
 executee automatiquement.
+
+Les routes internes n8n commencent par `/api/automations` et sont protegees par
+`X-Automation-Key`. Les trois workflows livres sont inactifs par defaut afin
+que l'admin verifie les horaires et configure les credentials externes avant
+activation. La procedure de mise en production est detaillee dans
+`docs/PRODUCTION.md`.
 
 ## Tests
 
