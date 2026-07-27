@@ -423,7 +423,9 @@ class SupportAgentService:
         if tokens & {"paiement", "payer", "carte", "cod", "cash"}:
             return "payment"
         if tokens & {
-            "commande", "colis", "statut", "suivi", "tracking", "retard",
+            "commande", "commende", "comande", "colis", "statut", "suivi",
+            "tracking", "retard", "retardee", "t3atlat", "ta3tlat",
+            "m3etla",
         }:
             return "order"
         if tokens & {"livraison", "livrer", "transport"}:

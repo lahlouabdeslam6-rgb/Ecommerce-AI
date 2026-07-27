@@ -58,8 +58,10 @@ _MUTATION_VERBS: set[str] = {
 _INTENT_KEYWORDS: dict[str, set[str]] = {
     "support": {
         "support", "aide", "livraison", "livrer", "retour",
-        "remboursement", "commande", "colis", "paiement", "cod",
-        "retard", "reclamation", "probleme", "tracking", "suivi",
+        "remboursement", "commande", "commende", "comande", "colis",
+        "paiement", "cod", "retard", "retardee", "reclamation",
+        "probleme", "tracking", "suivi", "t3atlat", "ta3tlat",
+        "m3etla",
     },
     "product": {
         # EN
@@ -225,7 +227,14 @@ class OrchestratorService:
                 ctx, message_normalised
             )
 
-        safety_result = await self._run_safety(request.message, results)
+        # Support Agent already applies its own safety rules. Running the
+        # Orchestrator safety pass again can hide a valid order answer when
+        # Ollama is unavailable, so it is intentionally skipped for support.
+        safety_result = (
+            None
+            if intent == "support"
+            else await self._run_safety(request.message, results)
+        )
         if safety_result is not None:
             results.append(safety_result)
             agents.append("safety")

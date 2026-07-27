@@ -130,6 +130,21 @@ async def test_customer_receives_only_owned_order_status() -> None:
 
 
 @pytest.mark.asyncio
+async def test_darija_misspelled_delayed_order_uses_latest_owned_order() -> None:
+    support = service(orders=[order(status="preparing")])
+
+    result = await support.preview(
+        SupportAgentRequest(message="l commende t3atlat 3liya"),
+        use_ai=False,
+    )
+
+    assert result.topic == "order"
+    assert result.order is not None
+    assert result.order.order_id == 42
+    assert result.order.order_status_label == "En préparation"
+
+
+@pytest.mark.asyncio
 async def test_unknown_or_unowned_order_is_not_exposed() -> None:
     support = service(orders=[order(order_id=99, user_id=8)])
 
@@ -183,6 +198,17 @@ def test_orchestrator_detects_support_intent_before_product_intent() -> None:
     )
 
 
+def test_orchestrator_understands_darija_delayed_order_typo() -> None:
+    support = OrchestratorService()
+    assert (
+        support._detect_domain_intent(
+            "l commende t3atlat 3liya",
+            None,
+        )
+        == "support"
+    )
+
+
 @pytest.mark.asyncio
 @patch("app.services.orchestrator_service.SupportAgentService")
 async def test_orchestrator_routes_customer_to_support(
@@ -211,6 +237,35 @@ async def test_orchestrator_routes_customer_to_support(
     assert result.selected_agents == ["support"]
     assert result.results[0].data["read_only"] is True
     support_class.return_value.preview.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@patch("app.services.orchestrator_service.SupportAgentService")
+async def test_support_result_does_not_run_duplicate_orchestrator_safety(
+    support_class: MagicMock,
+) -> None:
+    support_class.return_value.preview = AsyncMock(
+        return_value=SupportAgentResponse(
+            topic="order",
+            answer="Votre commande est en préparation.",
+            needs_human=False,
+            model="données de commande",
+        )
+    )
+    orchestrator = OrchestratorService(
+        session=AsyncMock(),
+        user=customer(),
+    )
+    orchestrator._run_safety = AsyncMock()  # type: ignore[method-assign]
+
+    result = await orchestrator.execute(
+        OrchestratorRequest(message="l commende t3atlat 3liya")
+    )
+
+    assert result.detected_intent == "support"
+    assert result.selected_agents == ["support"]
+    assert result.requires_confirmation is False
+    orchestrator._run_safety.assert_not_awaited()
 
 
 @pytest.mark.asyncio
