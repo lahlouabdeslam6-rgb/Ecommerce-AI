@@ -37,12 +37,16 @@ Le MVP local et l'infrastructure IA sont fonctionnels :
 - Stock Forecast Agent avec vitesse de vente, jours de couverture, date de
   rupture estimee, priorites et quantites de reapprovisionnement suggerees,
   sans modification automatique du catalogue.
+- Support Agent avec reponses sur les produits, le paiement, la livraison,
+  les retours et le statut des commandes du client connecte. Les demandes
+  sensibles sont bloquees et les cas non resolus passent au support humain.
 - AI Orchestrator avec detection d'intention en francais, anglais et darija
   latine, coordination Product, Recommendation, Content, Marketing, Analytics
-  et Safety, assistant client et espace de supervision admin avec historique.
+  Stock Forecast, Support et Safety, assistant client et espace de supervision
+  admin avec historique.
 
-Le paiement reel, l'envoi d'emails reel et les agents Support et Delivery sont
-prevus dans les prochaines phases.
+Le paiement reel, l'envoi d'emails reel et l'agent Delivery sont prevus dans
+les prochaines phases.
 
 ## Demarrage local
 
@@ -108,9 +112,17 @@ intelligent`. La route admin `GET /api/admin/ai/stock-forecast/report` calcule
 les risques de rupture a partir du stock MongoDB et des ventes SQLite. Ollama
 peut rediger une analyse, mais aucune quantite n'est appliquee automatiquement.
 
+Le Support Agent est integre a l'assistant flottant du client et disponible
+directement avec `POST /api/support/ai/chat`. Il lit uniquement les commandes
+du client connecte, le catalogue actif et les regles du site. Il ne modifie
+aucune donnee et ne cree pas de ticket automatiquement. Quand une intervention
+humaine est necessaire, le client confirme le passage vers `/help` et peut y
+ouvrir une demande.
+
 L'AI Orchestrator est disponible avec `POST /api/orchestrator/execute`. Le
-client connecte utilise l'assistant flottant pour chercher des produits selon
-son objectif et son budget. L'admin dispose de `Administration > AI
+client connecte utilise l'assistant flottant pour chercher des produits,
+suivre une commande et obtenir de l'aide sur la livraison ou le paiement.
+L'admin dispose de `Administration > AI
 Orchestrator` pour tester le routing, consulter les resultats des agents et la
 decision Safety. `GET /api/orchestrator/history` est reserve a l'admin et
 retourne l'historique trace dans les audit logs. Les actions de modification,

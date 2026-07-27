@@ -14,9 +14,10 @@ type ConversationItem = {
 };
 
 const quickPrompts = [
+  "Où est ma dernière commande ?",
+  "Comment fonctionne le paiement à la livraison ?",
   "Je cherche de la créatine à moins de 300 MAD en stock",
-  "Recommande-moi un produit pour la récupération",
-  "Je cherche une protéine adaptée à mon budget",
+  "J'ai besoin d'aide pour un retour",
 ];
 
 export function AIShoppingAssistant() {
@@ -57,14 +58,14 @@ export function AIShoppingAssistant() {
           <header>
             <div>
               <span className="brand-mark assistant-mark">N</span>
-              <div><strong>Assistant NUTRIFIT</strong><small>Produit + Recommandation + Sécurité</small></div>
+              <div><strong>Assistant NUTRIFIT</strong><small>Produits + Commandes + Support + Sécurité</small></div>
             </div>
             <button type="button" className="ai-close" onClick={() => setOpen(false)} aria-label="Fermer">×</button>
           </header>
           <div className="ai-assistant-thread">
             {conversation.length === 0 && (
               <div className="ai-welcome">
-                <p>Posez-moi une question sur un produit, un objectif ou votre budget.</p>
+                <p>Posez-moi une question sur un produit, une commande ou la livraison.</p>
                 <div>{quickPrompts.map((prompt) => (
                   <button key={prompt} type="button" onClick={() => setMessage(prompt)}>{prompt}</button>
                 ))}</div>
@@ -87,7 +88,7 @@ export function AIShoppingAssistant() {
                 value={message}
                 onChange={(event) => setMessage(event.target.value)}
                 maxLength={500}
-                placeholder="Ex. : créatine à moins de 300 MAD"
+                placeholder="Ex. : où est ma dernière commande ?"
               />
               <button className="button button-small" disabled={sending || !message.trim()}>
                 {sending ? "..." : "Envoyer"}

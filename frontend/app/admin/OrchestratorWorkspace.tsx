@@ -30,6 +30,10 @@ const examples = [
     message: "Prévois les risques de rupture de stock",
     taskType: "stock_forecast",
   },
+  {
+    message: "Comment fonctionne le paiement à la livraison ?",
+    taskType: "support",
+  },
 ];
 
 export function OrchestratorWorkspace() {
@@ -139,6 +143,7 @@ export function OrchestratorWorkspace() {
                 <option value="">Automatique (recommandé)</option>
                 <option value="product">Product Agent</option>
                 <option value="recommendation">Recommendation Agent</option>
+                <option value="support">Support Agent</option>
                 <option value="content">Content Agent</option>
                 <option value="marketing">Marketing Agent</option>
                 <option value="analytics">Analytics Agent</option>

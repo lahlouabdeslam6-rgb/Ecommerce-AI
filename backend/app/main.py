@@ -24,6 +24,7 @@ from app.api.operations import router as operations_router
 from app.api.products import router as products_router
 from app.api.recommendations import router as recommendations_router
 from app.api.support import router as support_router
+from app.api.support_agent import router as support_agent_router
 from app.api.stock_forecast import router as stock_forecast_router
 from app.api.orchestrator import router as orchestrator_router
 from app.api.tickets import router as tickets_router
@@ -139,6 +140,7 @@ app.include_router(admin_router, prefix="/api")
 app.include_router(analytics_router, prefix="/api")
 app.include_router(tickets_router, prefix="/api")
 app.include_router(support_router, prefix="/api")
+app.include_router(support_agent_router, prefix="/api")
 app.include_router(stock_forecast_router, prefix="/api")
 app.include_router(orchestrator_router, prefix="/api")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")

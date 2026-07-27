@@ -8,6 +8,7 @@ import type {
 const agentLabels: Record<string, string> = {
   product: "Product Agent",
   recommendation: "Recommendation Agent",
+  support: "Support Agent",
   content: "Content Agent",
   marketing: "Marketing Agent",
   safety: "Safety Agent",
@@ -18,6 +19,7 @@ const agentLabels: Record<string, string> = {
 const intentLabels: Record<string, string> = {
   product: "Produit",
   recommendation: "Recommandation",
+  support: "Assistance client",
   content: "Contenu",
   marketing: "Marketing",
   compound: "Produit et recommandation",
@@ -136,6 +138,72 @@ function SafetyResult({ result }: { result: OrchestratorAgentResult }) {
   );
 }
 
+function SupportResult({ result }: { result: OrchestratorAgentResult }) {
+  const answer = String(result.data.answer || result.data.error || "Aucune réponse disponible.");
+  const needsHuman = Boolean(result.data.needs_human);
+  const safetyNotice = result.data.safety_notice ? String(result.data.safety_notice) : "";
+  const supportUrl = String(result.data.support_url || "/help");
+  const order = result.data.order && typeof result.data.order === "object"
+    ? result.data.order as Record<string, unknown>
+    : null;
+  const product = result.data.product && typeof result.data.product === "object"
+    ? result.data.product as Record<string, unknown>
+    : null;
+  const productId = Number(product?.product_id);
+  const questions = Array.isArray(result.data.suggested_questions)
+    ? result.data.suggested_questions
+    : [];
+
+  return (
+    <div className="ai-support-result">
+      <p>{answer}</p>
+      {order && (
+        <div className="ai-support-context">
+          <div>
+            <small>Commande</small>
+            <strong>#{String(order.order_id || "")}</strong>
+          </div>
+          <div>
+            <small>Statut</small>
+            <strong>{String(order.order_status_label || order.order_status || "—")}</strong>
+          </div>
+          <div>
+            <small>Total</small>
+            <strong>{typeof order.total === "number" ? money(order.total) : "—"}</strong>
+          </div>
+        </div>
+      )}
+      {product && (
+        <div className="ai-support-product">
+          <div>
+            <small>Produit concerné</small>
+            <strong>{String(product.name || "Produit NUTRIFIT")}</strong>
+            <span>{Number(product.stock || 0) > 0 ? "En stock" : "Rupture de stock"}</span>
+          </div>
+          {Number.isInteger(productId) && productId > 0 && (
+            <Link href={`/products/${productId}`} className="text-link">
+              Voir le produit
+            </Link>
+          )}
+        </div>
+      )}
+      {safetyNotice && <div className="alert alert-warning">{safetyNotice}</div>}
+      {questions.length > 0 && (
+        <div className="ai-support-suggestions">
+          {questions.slice(0, 3).map((question, index) => (
+            <span key={index}>{String(question)}</span>
+          ))}
+        </div>
+      )}
+      {needsHuman && (
+        <Link href={supportUrl} className="button button-small">
+          Contacter le support humain
+        </Link>
+      )}
+    </div>
+  );
+}
+
 function GeneratedResult({ result }: { result: OrchestratorAgentResult }) {
   const hidden = new Set(["items", "disclaimer"]);
   const entries = Object.entries(result.data).filter(([key]) => !hidden.has(key));
@@ -192,6 +260,8 @@ export function OrchestratorResult({
             </header>
             {result.agent === "recommendation" ? (
               <RecommendationResult result={result} />
+            ) : result.agent === "support" ? (
+              <SupportResult result={result} />
             ) : result.agent === "safety" ? (
               <SafetyResult result={result} />
             ) : (

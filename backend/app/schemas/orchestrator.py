@@ -13,6 +13,7 @@ from app.schemas.marketing import CampaignType, MarketingTone, MarketingChannel
 class OrchestratorTaskType(str, Enum):
     product = "product"
     recommendation = "recommendation"
+    support = "support"
     content = "content"
     marketing = "marketing"
     analytics = "analytics"
@@ -21,6 +22,7 @@ class OrchestratorTaskType(str, Enum):
 
 ALLOWED_CONTEXT_KEYS = {
     "product_id",
+    "order_id",
     "objective",
     "max_price",
     "limit",
@@ -39,6 +41,7 @@ ALLOWED_CONTEXT_KEYS = {
 
 class OrchestratorContext(BaseModel):
     product_id: int | None = Field(None, gt=0)
+    order_id: int | None = Field(None, gt=0)
     objective: str | None = Field(None, min_length=2, max_length=500)
     max_price: float | None = Field(None, gt=0, le=100_000)
     limit: int | None = Field(None, ge=1, le=8)

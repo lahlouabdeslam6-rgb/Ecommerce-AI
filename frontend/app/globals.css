@@ -468,6 +468,18 @@ input:disabled { color:#817c75; background:#1b1a1d; }
 .ai-assistant .ai-generated-result>div { padding:10px 12px; }
 .ai-assistant .ai-recommendation-item { padding:10px 12px; font-size:12px; }
 .ai-assistant .ai-recommendation-meta { align-items:flex-end; flex-direction:column; gap:4px; }
+.ai-support-result { display:grid; gap:12px; padding:14px; }
+.ai-support-result>p { margin:0; color:#ddd5c9; line-height:1.65; }
+.ai-support-context { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.ai-support-context>div { display:grid; gap:4px; padding:10px; border:1px solid #3b3731; border-radius:9px; background:#151517; }
+.ai-support-context small,.ai-support-product small { color:#918980; font-size:10px; font-weight:800; text-transform:uppercase; }
+.ai-support-context strong { color:#e4c77e; font-size:12px; }
+.ai-support-product { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:11px 12px; border:1px solid #514326; border-radius:10px; background:#1b1813; }
+.ai-support-product>div { display:grid; gap:3px; }
+.ai-support-product span { color:#a9a095; font-size:11px; }
+.ai-support-suggestions { display:flex; flex-wrap:wrap; gap:6px; }
+.ai-support-suggestions span { padding:6px 8px; border:1px solid #39363a; border-radius:99px; color:#aaa198; font-size:10px; }
+.ai-support-result>.button { justify-self:start; }
 
 .analytics-actions { display:flex; align-items:flex-end; justify-content:flex-end; gap:10px; flex-wrap:wrap; }
 .analytics-actions label { display:grid; gap:5px; min-width:120px; }

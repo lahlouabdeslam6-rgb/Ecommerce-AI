@@ -25,8 +25,10 @@ from app.services.content_agent import ContentAgentService
 from app.services.marketing_agent import MarketingAgentService
 from app.services.analytics_agent import AnalyticsAgentService
 from app.services.stock_forecast_agent import StockForecastAgentService
+from app.services.support_agent import SupportAgentService
 from app.schemas.content import ContentGenerateRequest
 from app.schemas.marketing import MarketingGenerateRequest
+from app.schemas.support_agent import SupportAgentRequest
 from pydantic import ValidationError
 
 
@@ -54,6 +56,11 @@ _MUTATION_VERBS: set[str] = {
 # Intent keyword map  (EN / FR / Darija-Latin)
 # ---------------------------------------------------------------------------
 _INTENT_KEYWORDS: dict[str, set[str]] = {
+    "support": {
+        "support", "aide", "livraison", "livrer", "retour",
+        "remboursement", "commande", "colis", "paiement", "cod",
+        "retard", "reclamation", "probleme", "tracking", "suivi",
+    },
     "product": {
         # EN
         "product", "catalogue", "catalog", "item", "detail",
@@ -207,6 +214,11 @@ class OrchestratorService:
             results, agents = await self._handle_analytics(ctx)
         elif intent == "stock_forecast":
             results, agents = await self._handle_stock_forecast(ctx)
+        elif intent == "support":
+            results, agents = await self._handle_support(
+                ctx,
+                request.message,
+            )
         else:
             # Compound: product + recommendation
             results, agents = await self._handle_compound(
@@ -246,6 +258,10 @@ class OrchestratorService:
             return explicit.value
 
         tokens = set(re.findall(r"[a-z0-9]+", normalised))
+
+        support_hits = tokens & _INTENT_KEYWORDS["support"]
+        if support_hits:
+            return "support"
 
         forecast_hits = tokens & _INTENT_KEYWORDS["stock_forecast"]
         if forecast_hits:
@@ -341,6 +357,55 @@ class OrchestratorService:
         # Cart-based recommendation
         data = await self._call_recommendation_for_cart(ctx, normalised)
         return [data], ["recommendation"]
+
+    async def _handle_support(
+        self,
+        ctx: OrchestratorContext,
+        raw_message: str,
+    ) -> tuple[list[AgentResult], list[str]]:
+        if self.session is None or self.user is None:
+            return [
+                AgentResult(
+                    agent="support",
+                    status="error",
+                    data={"error": "Une session authentifiée est requise."},
+                )
+            ], ["support"]
+        try:
+            response = await SupportAgentService(
+                self.session,
+                self.user,
+            ).preview(
+                SupportAgentRequest(
+                    message=raw_message,
+                    order_id=ctx.order_id,
+                    product_id=ctx.product_id,
+                ),
+                use_ai=True,
+            )
+            return [
+                AgentResult(
+                    agent="support",
+                    status="success",
+                    data=response.model_dump(mode="json"),
+                )
+            ], ["support"]
+        except Exception as exc:
+            logger.warning("SupportAgent preview error: %s", exc)
+            return [
+                AgentResult(
+                    agent="support",
+                    status="error",
+                    data={
+                        "error": (
+                            "Le Support Agent est momentanément indisponible. "
+                            "Contactez le support humain."
+                        ),
+                        "support_url": "/help",
+                        "needs_human": True,
+                    },
+                )
+            ], ["support"]
 
     async def _handle_compound(
         self,

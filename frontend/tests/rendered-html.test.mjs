@@ -266,11 +266,16 @@ test("customer AI assistant routes requests through the Orchestrator", async () 
   assert.match(assistantSource, /user\?\.role !== "customer"/);
   assert.match(assistantSource, /\/api\/orchestrator\/execute/);
   assert.match(assistantSource, /Je cherche de la créatine à moins de 300 MAD/);
+  assert.match(assistantSource, /Où est ma dernière commande/);
+  assert.match(assistantSource, /Produits \+ Commandes \+ Support \+ Sécurité/);
   assert.match(resultSource, /Recommendation Agent/);
+  assert.match(resultSource, /Support Agent/);
   assert.match(resultSource, /Safety Agent/);
   assert.match(resultSource, /\/products\/\$\{productId\}/);
   assert.match(resultSource, /ai-recommendation-item ai-recommendation-link/);
   assert.match(resultSource, /Voir le produit/);
+  assert.match(resultSource, /Contacter le support humain/);
+  assert.match(resultSource, /result\.agent === "support"/);
 });
 
 test("admin AI Orchestrator exposes routing, safety and persistent history", async () => {
@@ -294,6 +299,8 @@ test("admin AI Orchestrator exposes routing, safety and persistent history", asy
   assert.match(workspaceSource, /Résultat prêt/);
   assert.match(workspaceSource, /Analyse les ventes des 30 derniers jours/);
   assert.match(workspaceSource, /Analytics Agent/);
+  assert.match(workspaceSource, /Support Agent/);
+  assert.match(workspaceSource, /paiement à la livraison/);
 });
 
 test("admin Analytics Agent exposes read-only sales intelligence in French", async () => {
