@@ -15,6 +15,7 @@ class OrchestratorTaskType(str, Enum):
     recommendation = "recommendation"
     content = "content"
     marketing = "marketing"
+    analytics = "analytics"
 
 
 ALLOWED_CONTEXT_KEYS = {
@@ -30,6 +31,7 @@ ALLOWED_CONTEXT_KEYS = {
     "campaign_type",
     "channels",
     "offer_details",
+    "period_days",
 }
 
 
@@ -48,6 +50,7 @@ class OrchestratorContext(BaseModel):
     campaign_type: CampaignType | None = Field(None)
     channels: list[MarketingChannel] | None = Field(None, min_length=1, max_length=4)
     offer_details: str | None = Field(None, max_length=500)
+    period_days: int | None = Field(None, ge=7, le=90)
 
     @model_validator(mode="before")
     @classmethod

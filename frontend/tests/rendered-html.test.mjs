@@ -292,4 +292,24 @@ test("admin AI Orchestrator exposes routing, safety and persistent history", asy
   assert.match(workspaceSource, /setTaskType\(example\.taskType\)/);
   assert.match(workspaceSource, /Le Product Agent nécessite un identifiant de produit valide/);
   assert.match(workspaceSource, /Résultat prêt/);
+  assert.match(workspaceSource, /Analyse les ventes des 30 derniers jours/);
+  assert.match(workspaceSource, /Analytics Agent/);
+});
+
+test("admin Analytics Agent exposes read-only sales intelligence in French", async () => {
+  const [adminSource, analyticsSource] = await Promise.all([
+    readFile(new URL("../app/admin/page.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/admin/AnalyticsAgentWorkspace.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
+  assert.match(adminSource, /\["analytics", "Analytics AI"\]/);
+  assert.match(adminSource, /AnalyticsAgentWorkspace/);
+  assert.match(analyticsSource, /\/api\/admin\/ai\/analytics\/report/);
+  assert.match(analyticsSource, /Générer le résumé IA/);
+  assert.match(analyticsSource, /Revenu confirmé/);
+  assert.match(analyticsSource, /Produits les plus vendus/);
+  assert.match(analyticsSource, /Produits sans vente/);
+  assert.match(analyticsSource, /lecture seule/);
 });

@@ -31,12 +31,15 @@ Le MVP local et l'infrastructure IA sont fonctionnels :
 - Recommendation Agent avec suggestions similaires sur les fiches produits,
   personnalisation par panier, commandes, objectif et budget, Qdrant avec
   fallback MongoDB, uniquement sur les produits actifs et disponibles.
+- Analytics Agent avec indicateurs sur 7, 30 ou 90 jours, comparaison avec la
+  periode precedente, produits les plus vendus, produits sans vente et resume
+  Ollama optionnel en lecture seule.
 - AI Orchestrator avec detection d'intention en francais, anglais et darija
-  latine, coordination Product, Recommendation, Content, Marketing et Safety,
-  assistant client et espace de supervision admin avec historique.
+  latine, coordination Product, Recommendation, Content, Marketing, Analytics
+  et Safety, assistant client et espace de supervision admin avec historique.
 
-Le paiement reel, l'envoi d'emails reel et les agents Support, Analytics,
-Stock Forecast et Delivery sont prevus dans les prochaines phases.
+Le paiement reel, l'envoi d'emails reel et les agents Support, Stock Forecast
+et Delivery sont prevus dans les prochaines phases.
 
 ## Demarrage local
 
@@ -90,6 +93,12 @@ une promesse medicale dangereuse bloque l'action avant toute modification.
 Le Recommendation Agent apparait sous les fiches produits et dans le panier.
 Il classe les produits disponibles avec Qdrant et les donnees du catalogue. Le
 client connecte peut aussi choisir un objectif et un budget maximum par produit.
+
+L'Analytics Agent est disponible dans `Administration > Analytics AI`. La
+route admin `GET /api/admin/ai/analytics/report` calcule les ventes et tendances
+sur 7, 30 ou 90 jours. Le bouton de resume IA utilise Ollama et conserve un
+resume local de secours si le modele est indisponible. Cette analyse est
+strictement en lecture seule.
 
 L'AI Orchestrator est disponible avec `POST /api/orchestrator/execute`. Le
 client connecte utilise l'assistant flottant pour chercher des produits selon

@@ -23,6 +23,7 @@ from app.services.recommendation_agent import RecommendationAgentService
 from app.services.safety_agent import SafetyAgentService
 from app.services.content_agent import ContentAgentService
 from app.services.marketing_agent import MarketingAgentService
+from app.services.analytics_agent import AnalyticsAgentService
 from app.schemas.content import ContentGenerateRequest
 from app.schemas.marketing import MarketingGenerateRequest
 from pydantic import ValidationError
@@ -76,6 +77,10 @@ _INTENT_KEYWORDS: dict[str, set[str]] = {
     },
     "marketing": {
         "marketing", "campagne", "campaign", "promotion", "promo", "email"
+    },
+    "analytics": {
+        "analytics", "analytique", "analyse", "ventes", "vente", "revenu",
+        "revenue", "statistiques", "performance", "chiffre", "dashboard",
     },
 }
 
@@ -146,11 +151,11 @@ class OrchestratorService:
         )
 
         # 2. Admin Check for Content/Marketing
-        if intent in ("content", "marketing"):
+        if intent in ("content", "marketing", "analytics"):
             if self.user is None or self.user.role != "admin":
                 raise HTTPException(
                     status.HTTP_403_FORBIDDEN,
-                    "Content and Marketing intents require admin role.",
+                    "Les agents Content, Marketing et Analytics sont réservés aux administrateurs.",
                 )
 
         proposed_action = (
@@ -193,6 +198,8 @@ class OrchestratorService:
             results, agents = await self._handle_content(ctx, message_normalised)
         elif intent == "marketing":
             results, agents = await self._handle_marketing(ctx, message_normalised)
+        elif intent == "analytics":
+            results, agents = await self._handle_analytics(ctx)
         else:
             # Compound: product + recommendation
             results, agents = await self._handle_compound(
@@ -248,7 +255,10 @@ class OrchestratorService:
 
         content_hits = tokens & _INTENT_KEYWORDS["content"]
         marketing_hits = tokens & _INTENT_KEYWORDS["marketing"]
+        analytics_hits = tokens & _INTENT_KEYWORDS["analytics"]
 
+        if analytics_hits:
+            return "analytics"
         if content_hits:
             return "content"
         if marketing_hits:
@@ -571,3 +581,37 @@ class OrchestratorService:
         except Exception as exc:
             logger.warning("MarketingAgent preview error: %s", exc)
             return [AgentResult(agent="marketing", status="error", data={"error": str(exc)})], ["marketing"]
+
+    async def _handle_analytics(
+        self,
+        ctx: OrchestratorContext,
+    ) -> tuple[list[AgentResult], list[str]]:
+        if self.session is None:
+            return [
+                AgentResult(
+                    agent="analytics",
+                    status="error",
+                    data={"error": "Session required"},
+                )
+            ], ["analytics"]
+        try:
+            report = await AnalyticsAgentService(self.session).report(
+                ctx.period_days or 30,
+                use_ai=False,
+            )
+            return [
+                AgentResult(
+                    agent="analytics",
+                    status="success",
+                    data=report.model_dump(mode="json"),
+                )
+            ], ["analytics"]
+        except Exception as exc:
+            logger.warning("AnalyticsAgent report error: %s", exc)
+            return [
+                AgentResult(
+                    agent="analytics",
+                    status="error",
+                    data={"error": str(exc)},
+                )
+            ], ["analytics"]

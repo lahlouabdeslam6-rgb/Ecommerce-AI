@@ -22,6 +22,10 @@ const examples = [
     message: "Prépare une campagne de promotion pour la créatine sur Instagram et par email",
     taskType: "marketing",
   },
+  {
+    message: "Analyse les ventes des 30 derniers jours",
+    taskType: "analytics",
+  },
 ];
 
 export function OrchestratorWorkspace() {
@@ -133,6 +137,7 @@ export function OrchestratorWorkspace() {
                 <option value="recommendation">Recommendation Agent</option>
                 <option value="content">Content Agent</option>
                 <option value="marketing">Marketing Agent</option>
+                <option value="analytics">Analytics Agent</option>
               </select>
               <small>
                 Laissez le mode automatique pour que l&apos;Orchestrator sélectionne l&apos;agent adapté.
