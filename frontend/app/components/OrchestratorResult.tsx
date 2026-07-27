@@ -143,6 +143,11 @@ function SupportResult({ result }: { result: OrchestratorAgentResult }) {
   const needsHuman = Boolean(result.data.needs_human);
   const safetyNotice = result.data.safety_notice ? String(result.data.safety_notice) : "";
   const supportUrl = String(result.data.support_url || "/help");
+  const ticketId = Number(result.data.ticket_id);
+  const ticketCreated = Boolean(result.data.ticket_created);
+  const handoffMessage = result.data.handoff_message
+    ? String(result.data.handoff_message)
+    : "";
   const order = result.data.order && typeof result.data.order === "object"
     ? result.data.order as Record<string, unknown>
     : null;
@@ -188,6 +193,14 @@ function SupportResult({ result }: { result: OrchestratorAgentResult }) {
         </div>
       )}
       {safetyNotice && <div className="alert alert-warning">{safetyNotice}</div>}
+      {handoffMessage && (
+        <div className="ai-support-handoff">
+          <strong>
+            {ticketCreated ? "Demande transmise" : "Demande déjà ouverte"}
+          </strong>
+          <span>{handoffMessage}</span>
+        </div>
+      )}
       {questions.length > 0 && (
         <div className="ai-support-suggestions">
           {questions.slice(0, 3).map((question, index) => (
@@ -197,7 +210,9 @@ function SupportResult({ result }: { result: OrchestratorAgentResult }) {
       )}
       {needsHuman && (
         <Link href={supportUrl} className="button button-small">
-          Contacter le support humain
+          {Number.isInteger(ticketId) && ticketId > 0
+            ? `Suivre la demande #${ticketId}`
+            : "Contacter le support humain"}
         </Link>
       )}
     </div>

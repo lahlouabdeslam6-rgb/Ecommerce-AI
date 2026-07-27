@@ -479,6 +479,9 @@ input:disabled { color:#817c75; background:#1b1a1d; }
 .ai-support-product span { color:#a9a095; font-size:11px; }
 .ai-support-suggestions { display:flex; flex-wrap:wrap; gap:6px; }
 .ai-support-suggestions span { padding:6px 8px; border:1px solid #39363a; border-radius:99px; color:#aaa198; font-size:10px; }
+.ai-support-handoff { display:grid; gap:4px; padding:11px 12px; border:1px solid #745d31; border-radius:10px; color:#d9d0c1; background:#211b12; }
+.ai-support-handoff strong { color:#e4c77e; font-size:12px; }
+.ai-support-handoff span { font-size:11px; line-height:1.5; }
 .ai-support-result>.button { justify-self:start; }
 
 .analytics-actions { display:flex; align-items:flex-end; justify-content:flex-end; gap:10px; flex-wrap:wrap; }

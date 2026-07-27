@@ -22,6 +22,7 @@ from app.schemas.support_agent import (
     SupportProductContext,
 )
 from app.services.safety_agent import SafetyAgentService
+from app.services.support import SupportService
 
 
 logger = logging.getLogger("nutrifit.support_agent")
@@ -75,11 +76,13 @@ class SupportAgentService:
         *,
         order_repository: OrderRepository | None = None,
         product_repository: ProductRepository | None = None,
+        support_service: SupportService | None = None,
     ) -> None:
         self.session = session
         self.user = user
         self.order_repository = order_repository or OrderRepository(session)
         self.product_repository = product_repository or ProductRepository()
+        self.support_service = support_service or SupportService(session)
 
     async def preview(
         self,
@@ -114,6 +117,39 @@ class SupportAgentService:
         order = await self._resolve_order(request, normalized, topic)
         if topic == "order" and order is not None:
             context = self._order_context(order)
+            if self._is_delay_escalation(normalized):
+                ticket, created = await self.support_service.handoff_delayed_order(
+                    self.user,
+                    order_id=order.id,
+                    message=request.message,
+                )
+                handoff_message = (
+                    "Votre signalement a été transmis au support humain. "
+                    "Notre équipe va examiner le retard et vous répondre dans "
+                    "les plus brefs délais."
+                    if created
+                    else (
+                        "Cette commande possède déjà une demande ouverte auprès "
+                        "du support humain. Notre équipe va la prendre en charge "
+                        "dans les plus brefs délais."
+                    )
+                )
+                return SupportAgentResponse(
+                    topic=topic,
+                    answer=(
+                        f"La commande #{order.id} est actuellement "
+                        f"« {context.order_status_label} »."
+                    ),
+                    needs_human=True,
+                    order=context,
+                    suggested_questions=["Suivre ma demande de support"],
+                    support_url=f"/help?ticket={ticket.id}",
+                    ticket_id=ticket.id,
+                    ticket_created=created,
+                    handoff_message=handoff_message,
+                    model="données de commande + support humain",
+                    read_only=False,
+                )
             return SupportAgentResponse(
                 topic=topic,
                 answer=(
@@ -436,6 +472,23 @@ class SupportAgentService:
         }:
             return "product"
         return "general"
+
+    @staticmethod
+    def _is_delay_escalation(normalized: str) -> bool:
+        tokens = set(re.findall(r"[a-z0-9]+", normalized))
+        return bool(
+            tokens
+            & {
+                "retard",
+                "retardee",
+                "bloquee",
+                "t3atlat",
+                "ta3tlat",
+                "m3etla",
+                "mawsletch",
+                "mabghatch",
+            }
+        )
 
     @staticmethod
     def _order_context(order: Order) -> SupportOrderContext:

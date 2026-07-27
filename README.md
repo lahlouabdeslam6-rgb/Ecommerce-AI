@@ -114,10 +114,11 @@ peut rediger une analyse, mais aucune quantite n'est appliquee automatiquement.
 
 Le Support Agent est integre a l'assistant flottant du client et disponible
 directement avec `POST /api/support/ai/chat`. Il lit uniquement les commandes
-du client connecte, le catalogue actif et les regles du site. Il ne modifie
-aucune donnee et ne cree pas de ticket automatiquement. Quand une intervention
-humaine est necessaire, le client confirme le passage vers `/help` et peut y
-ouvrir une demande.
+du client connecte, le catalogue actif et les regles du site. Une question
+ordinaire reste en lecture seule. Quand le client signale une commande en
+retard, l'agent cree une demande liee a la commande, notifie le support et
+l'admin, puis donne au client un lien de suivi. Une demande ouverte existante
+est reutilisee afin d'eviter les doublons.
 
 L'AI Orchestrator est disponible avec `POST /api/orchestrator/execute`. Le
 client connecte utilise l'assistant flottant pour chercher des produits,

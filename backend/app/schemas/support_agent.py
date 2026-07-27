@@ -50,5 +50,8 @@ class SupportAgentResponse(BaseModel):
     suggested_questions: list[str] = Field(default_factory=list)
     safety_notice: str | None = None
     support_url: str = "/help"
+    ticket_id: int | None = None
+    ticket_created: bool = False
+    handoff_message: str | None = None
     model: str
     read_only: bool = True

@@ -48,6 +48,42 @@ class SupportService:
         await self.session.commit()
         return TicketResponse.model_validate(ticket)
 
+    async def handoff_delayed_order(
+        self,
+        user: User,
+        *,
+        order_id: int,
+        message: str,
+    ) -> tuple[TicketResponse, bool]:
+        tickets = await self.list_tickets(
+            page=1,
+            page_size=100,
+            user_id=user.id,
+        )
+        existing = next(
+            (
+                ticket
+                for ticket in tickets.items
+                if ticket.order_id == order_id
+                and ticket.category in {"order", "delivery"}
+                and ticket.status in {"open", "in_progress"}
+            ),
+            None,
+        )
+        if existing is not None:
+            return existing, False
+
+        ticket = await self.create_ticket(
+            user,
+            TicketCreate(
+                subject=f"Retard de la commande #{order_id}",
+                category="delivery",
+                order_id=order_id,
+                message=message.strip(),
+            ),
+        )
+        return ticket, True
+
     async def list_tickets(
         self,
         *,

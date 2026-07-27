@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Protected } from "../components/Protected";
 import { api } from "../lib/api";
 import type { PaginatedOrders, SupportTicket, TicketList } from "../types";
@@ -13,6 +14,8 @@ const statusLabels: Record<string, string> = {
 };
 
 export default function HelpPage() {
+  const searchParams = useSearchParams();
+  const requestedTicketId = Number(searchParams.get("ticket"));
   const [tickets, setTickets] = useState<TicketList | null>(null);
   const [orders, setOrders] = useState<PaginatedOrders | null>(null);
   const [selected, setSelected] = useState<SupportTicket | null>(null);
@@ -29,7 +32,12 @@ export default function HelpPage() {
       ]);
       setTickets(ticketData);
       setOrders(orderData);
-      if (selected) setSelected(ticketData.items.find((item) => item.id === selected.id) || null);
+      const ticketToSelect = requestedTicketId || selected?.id;
+      if (ticketToSelect) {
+        setSelected(
+          ticketData.items.find((item) => item.id === ticketToSelect) || null,
+        );
+      }
     } catch (err) {
       setError((err as Error).message);
     }

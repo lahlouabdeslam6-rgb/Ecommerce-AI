@@ -251,7 +251,7 @@ test("Recommendation Agent appears on product detail and cart", async () => {
 });
 
 test("customer AI assistant routes requests through the Orchestrator", async () => {
-  const [layoutSource, assistantSource, resultSource] = await Promise.all([
+  const [layoutSource, assistantSource, resultSource, helpSource] = await Promise.all([
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(
       new URL("../app/components/AIShoppingAssistant.tsx", import.meta.url),
@@ -261,6 +261,7 @@ test("customer AI assistant routes requests through the Orchestrator", async () 
       new URL("../app/components/OrchestratorResult.tsx", import.meta.url),
       "utf8",
     ),
+    readFile(new URL("../app/help/page.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(layoutSource, /AIShoppingAssistant/);
   assert.match(assistantSource, /user\?\.role !== "customer"/);
@@ -275,6 +276,10 @@ test("customer AI assistant routes requests through the Orchestrator", async () 
   assert.match(resultSource, /ai-recommendation-item ai-recommendation-link/);
   assert.match(resultSource, /Voir le produit/);
   assert.match(resultSource, /Contacter le support humain/);
+  assert.match(resultSource, /Demande transmise/);
+  assert.match(resultSource, /Suivre la demande/);
+  assert.match(helpSource, /searchParams\.get\("ticket"\)/);
+  assert.match(helpSource, /ticketToSelect/);
   assert.match(resultSource, /result\.agent === "support"/);
 });
 

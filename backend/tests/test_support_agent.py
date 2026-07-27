@@ -9,6 +9,7 @@ from app.models.user import User
 from app.schemas.orchestrator import OrchestratorRequest
 from app.schemas.support_agent import SupportAgentRequest, SupportAgentResponse
 from app.services.orchestrator_service import OrchestratorService
+from app.services.support import SupportService
 from app.services.support_agent import SupportAgentService
 
 
@@ -84,15 +85,26 @@ class FakeProductRepository:
         return [self.product], 1
 
 
+class FakeSupportService:
+    def __init__(self, *, ticket_id: int = 81, created: bool = True) -> None:
+        self.ticket_id = ticket_id
+        self.created = created
+        self.handoff_delayed_order = AsyncMock(
+            return_value=(MagicMock(id=ticket_id), created)
+        )
+
+
 def service(
     *,
     orders: list[MagicMock] | None = None,
+    support_service: FakeSupportService | None = None,
 ) -> SupportAgentService:
     return SupportAgentService(
         AsyncMock(),
         customer(),
         order_repository=FakeOrderRepository(orders),  # type: ignore[arg-type]
         product_repository=FakeProductRepository(),  # type: ignore[arg-type]
+        support_service=support_service or FakeSupportService(),  # type: ignore[arg-type]
     )
 
 
@@ -131,7 +143,11 @@ async def test_customer_receives_only_owned_order_status() -> None:
 
 @pytest.mark.asyncio
 async def test_darija_misspelled_delayed_order_uses_latest_owned_order() -> None:
-    support = service(orders=[order(status="preparing")])
+    human_support = FakeSupportService(ticket_id=81, created=True)
+    support = service(
+        orders=[order(status="preparing")],
+        support_service=human_support,
+    )
 
     result = await support.preview(
         SupportAgentRequest(message="l commende t3atlat 3liya"),
@@ -142,6 +158,67 @@ async def test_darija_misspelled_delayed_order_uses_latest_owned_order() -> None
     assert result.order is not None
     assert result.order.order_id == 42
     assert result.order.order_status_label == "En préparation"
+    assert result.ticket_id == 81
+    assert result.ticket_created is True
+    assert result.support_url == "/help?ticket=81"
+    assert result.read_only is False
+    assert "transmis au support humain" in str(result.handoff_message)
+    human_support.handoff_delayed_order.assert_awaited_once_with(
+        support.user,
+        order_id=42,
+        message="l commende t3atlat 3liya",
+    )
+
+
+@pytest.mark.asyncio
+async def test_existing_open_delay_ticket_is_reused_without_duplicate() -> None:
+    existing = MagicMock(
+        id=90,
+        order_id=42,
+        category="delivery",
+        status="in_progress",
+    )
+    support = SupportService(AsyncMock())
+    support.list_tickets = AsyncMock(
+        return_value=MagicMock(items=[existing])
+    )  # type: ignore[method-assign]
+    support.create_ticket = AsyncMock()  # type: ignore[method-assign]
+
+    ticket, created = await support.handoff_delayed_order(
+        customer(),
+        order_id=42,
+        message="l commende mazal ma wslat",
+    )
+
+    assert ticket.id == 90
+    assert created is False
+    support.create_ticket.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_new_delay_handoff_creates_delivery_ticket_for_order() -> None:
+    created_ticket = MagicMock(id=91)
+    support = SupportService(AsyncMock())
+    support.list_tickets = AsyncMock(
+        return_value=MagicMock(items=[])
+    )  # type: ignore[method-assign]
+    support.create_ticket = AsyncMock(
+        return_value=created_ticket
+    )  # type: ignore[method-assign]
+    user = customer()
+
+    ticket, created = await support.handoff_delayed_order(
+        user,
+        order_id=42,
+        message="l commende t3atlat 3liya",
+    )
+
+    assert ticket.id == 91
+    assert created is True
+    create_data = support.create_ticket.await_args.args[1]
+    assert create_data.order_id == 42
+    assert create_data.category == "delivery"
+    assert create_data.subject == "Retard de la commande #42"
 
 
 @pytest.mark.asyncio
