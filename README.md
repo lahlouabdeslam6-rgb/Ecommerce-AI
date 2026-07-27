@@ -34,12 +34,15 @@ Le MVP local et l'infrastructure IA sont fonctionnels :
 - Analytics Agent avec indicateurs sur 7, 30 ou 90 jours, comparaison avec la
   periode precedente, produits les plus vendus, produits sans vente et resume
   Ollama optionnel en lecture seule.
+- Stock Forecast Agent avec vitesse de vente, jours de couverture, date de
+  rupture estimee, priorites et quantites de reapprovisionnement suggerees,
+  sans modification automatique du catalogue.
 - AI Orchestrator avec detection d'intention en francais, anglais et darija
   latine, coordination Product, Recommendation, Content, Marketing, Analytics
   et Safety, assistant client et espace de supervision admin avec historique.
 
-Le paiement reel, l'envoi d'emails reel et les agents Support, Stock Forecast
-et Delivery sont prevus dans les prochaines phases.
+Le paiement reel, l'envoi d'emails reel et les agents Support et Delivery sont
+prevus dans les prochaines phases.
 
 ## Demarrage local
 
@@ -99,6 +102,11 @@ route admin `GET /api/admin/ai/analytics/report` calcule les ventes et tendances
 sur 7, 30 ou 90 jours. Le bouton de resume IA utilise Ollama et conserve un
 resume local de secours si le modele est indisponible. Cette analyse est
 strictement en lecture seule.
+
+Le Stock Forecast Agent est disponible dans `Administration > Stock
+intelligent`. La route admin `GET /api/admin/ai/stock-forecast/report` calcule
+les risques de rupture a partir du stock MongoDB et des ventes SQLite. Ollama
+peut rediger une analyse, mais aucune quantite n'est appliquee automatiquement.
 
 L'AI Orchestrator est disponible avec `POST /api/orchestrator/execute`. Le
 client connecte utilise l'assistant flottant pour chercher des produits selon

@@ -317,3 +317,27 @@ test("admin Analytics Agent exposes read-only sales intelligence in French", asy
   assert.match(analyticsSource, /analytics-top-products-chart/);
   assert.match(analyticsSource, /Évolution quotidienne/);
 });
+
+test("admin Stock Forecast Agent explains stock risks with simple graphs", async () => {
+  const [adminSource, stockSource, orchestratorSource] = await Promise.all([
+    readFile(new URL("../app/admin/page.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/admin/StockForecastWorkspace.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/admin/OrchestratorWorkspace.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
+  assert.match(adminSource, /\["stock-forecast", "Stock intelligent"\]/);
+  assert.match(adminSource, /StockForecastWorkspace/);
+  assert.match(stockSource, /\/api\/admin\/ai\/stock-forecast\/report/);
+  assert.match(stockSource, /Répartition du risque/);
+  assert.match(stockSource, /Jours de stock restants/);
+  assert.match(stockSource, /Priorités de stock/);
+  assert.match(stockSource, /quantité suggérée/);
+  assert.match(stockSource, /ne passe aucune commande fournisseur/);
+  assert.match(orchestratorSource, /Stock Forecast Agent/);
+  assert.match(orchestratorSource, /Prévois les risques de rupture de stock/);
+});

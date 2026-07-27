@@ -16,6 +16,7 @@ class OrchestratorTaskType(str, Enum):
     content = "content"
     marketing = "marketing"
     analytics = "analytics"
+    stock_forecast = "stock_forecast"
 
 
 ALLOWED_CONTEXT_KEYS = {
@@ -32,6 +33,7 @@ ALLOWED_CONTEXT_KEYS = {
     "channels",
     "offer_details",
     "period_days",
+    "lookback_days",
 }
 
 
@@ -51,6 +53,7 @@ class OrchestratorContext(BaseModel):
     channels: list[MarketingChannel] | None = Field(None, min_length=1, max_length=4)
     offer_details: str | None = Field(None, max_length=500)
     period_days: int | None = Field(None, ge=7, le=90)
+    lookback_days: int | None = Field(None, ge=14, le=90)
 
     @model_validator(mode="before")
     @classmethod

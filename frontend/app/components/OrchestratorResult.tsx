@@ -12,6 +12,7 @@ const agentLabels: Record<string, string> = {
   marketing: "Marketing Agent",
   safety: "Safety Agent",
   analytics: "Analytics Agent",
+  stock_forecast: "Stock Forecast Agent",
 };
 
 const intentLabels: Record<string, string> = {
@@ -21,6 +22,7 @@ const intentLabels: Record<string, string> = {
   marketing: "Marketing",
   compound: "Produit et recommandation",
   analytics: "Analyse des ventes",
+  stock_forecast: "Prévision du stock",
 };
 
 const statusLabels: Record<string, string> = {
@@ -63,6 +65,10 @@ const fieldLabels: Record<string, string> = {
   alerts: "Alertes",
   model: "Modèle",
   read_only: "Lecture seule",
+  items: "Produits analysés",
+  analysis: "Analyse",
+  lookback_days: "Période analysée",
+  target_cover_days: "Objectif de couverture",
 };
 
 function displayValue(value: unknown): string {

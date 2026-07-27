@@ -24,6 +24,7 @@ from app.services.safety_agent import SafetyAgentService
 from app.services.content_agent import ContentAgentService
 from app.services.marketing_agent import MarketingAgentService
 from app.services.analytics_agent import AnalyticsAgentService
+from app.services.stock_forecast_agent import StockForecastAgentService
 from app.schemas.content import ContentGenerateRequest
 from app.schemas.marketing import MarketingGenerateRequest
 from pydantic import ValidationError
@@ -81,6 +82,10 @@ _INTENT_KEYWORDS: dict[str, set[str]] = {
     "analytics": {
         "analytics", "analytique", "analyse", "ventes", "vente", "revenu",
         "revenue", "statistiques", "performance", "chiffre", "dashboard",
+    },
+    "stock_forecast": {
+        "forecast", "prevision", "rupture", "reapprovisionnement",
+        "approvisionnement", "epuisement",
     },
 }
 
@@ -151,11 +156,11 @@ class OrchestratorService:
         )
 
         # 2. Admin Check for Content/Marketing
-        if intent in ("content", "marketing", "analytics"):
+        if intent in ("content", "marketing", "analytics", "stock_forecast"):
             if self.user is None or self.user.role != "admin":
                 raise HTTPException(
                     status.HTTP_403_FORBIDDEN,
-                    "Les agents Content, Marketing et Analytics sont réservés aux administrateurs.",
+                    "Les agents Content, Marketing, Analytics et Stock Forecast sont réservés aux administrateurs.",
                 )
 
         proposed_action = (
@@ -200,6 +205,8 @@ class OrchestratorService:
             results, agents = await self._handle_marketing(ctx, message_normalised)
         elif intent == "analytics":
             results, agents = await self._handle_analytics(ctx)
+        elif intent == "stock_forecast":
+            results, agents = await self._handle_stock_forecast(ctx)
         else:
             # Compound: product + recommendation
             results, agents = await self._handle_compound(
@@ -239,6 +246,10 @@ class OrchestratorService:
             return explicit.value
 
         tokens = set(re.findall(r"[a-z0-9]+", normalised))
+
+        forecast_hits = tokens & _INTENT_KEYWORDS["stock_forecast"]
+        if forecast_hits:
+            return "stock_forecast"
 
         product_hits = tokens & _INTENT_KEYWORDS["product"]
         rec_hits = tokens & _INTENT_KEYWORDS["recommendation"]
@@ -615,3 +626,38 @@ class OrchestratorService:
                     data={"error": str(exc)},
                 )
             ], ["analytics"]
+
+    async def _handle_stock_forecast(
+        self,
+        ctx: OrchestratorContext,
+    ) -> tuple[list[AgentResult], list[str]]:
+        if self.session is None:
+            return [
+                AgentResult(
+                    agent="stock_forecast",
+                    status="error",
+                    data={"error": "Session required"},
+                )
+            ], ["stock_forecast"]
+        try:
+            report = await StockForecastAgentService(self.session).report(
+                ctx.lookback_days or 30,
+                target_cover_days=30,
+                use_ai=False,
+            )
+            return [
+                AgentResult(
+                    agent="stock_forecast",
+                    status="success",
+                    data=report.model_dump(mode="json"),
+                )
+            ], ["stock_forecast"]
+        except Exception as exc:
+            logger.warning("StockForecastAgent report error: %s", exc)
+            return [
+                AgentResult(
+                    agent="stock_forecast",
+                    status="error",
+                    data={"error": str(exc)},
+                )
+            ], ["stock_forecast"]

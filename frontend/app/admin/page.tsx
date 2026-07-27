@@ -12,6 +12,7 @@ import { AnalyticsAgentWorkspace } from "./AnalyticsAgentWorkspace";
 import { MarketingAgentWorkspace } from "./MarketingAgentWorkspace";
 import { OrchestratorWorkspace } from "./OrchestratorWorkspace";
 import { SafetyAgentWorkspace } from "./SafetyAgentWorkspace";
+import { StockForecastWorkspace } from "./StockForecastWorkspace";
 import { api, money } from "../lib/api";
 import type { PaginatedOrders, Product, ProductList, User } from "../types";
 
@@ -226,7 +227,7 @@ export default function AdminPage() {
     }
   };
 
-  return <Protected admin><section className="admin-shell"><aside className="admin-sidebar"><p className="kicker">Administration</p><h1>Pilotage</h1>{[["dashboard", "Vue d'ensemble"], ["products", "Produits"], ["orchestrator", "AI Orchestrator"], ["analytics", "Analytics AI"], ["content", "Contenu AI"], ["marketing", "Marketing AI"], ["safety", "Safety AI"], ["orders", "Commandes"], ["messages", "Messages clients"], ["support-users", "Equipe support"], ["users", "Utilisateurs"], ["audit", "Historique"]].map(([value, label]) => <button key={value} className={tab === value || (value === "support-users" && tab === "support-editor") ? "active" : ""} onClick={() => setTab(value)}>{label}</button>)}</aside><div className="admin-content">{message && <div className="alert alert-success">{message}</div>}{error && <div className="alert alert-error">{error}</div>}
+  return <Protected admin><section className="admin-shell"><aside className="admin-sidebar"><p className="kicker">Administration</p><h1>Pilotage</h1>{[["dashboard", "Vue d'ensemble"], ["products", "Produits"], ["orchestrator", "AI Orchestrator"], ["analytics", "Analytics AI"], ["stock-forecast", "Stock intelligent"], ["content", "Contenu AI"], ["marketing", "Marketing AI"], ["safety", "Safety AI"], ["orders", "Commandes"], ["messages", "Messages clients"], ["support-users", "Equipe support"], ["users", "Utilisateurs"], ["audit", "Historique"]].map(([value, label]) => <button key={value} className={tab === value || (value === "support-users" && tab === "support-editor") ? "active" : ""} onClick={() => setTab(value)}>{label}</button>)}</aside><div className="admin-content">{message && <div className="alert alert-success">{message}</div>}{error && <div className="alert alert-error">{error}</div>}
 
     {tab === "dashboard" && <><Title kicker="Aujourd'hui" title="Vue d'ensemble" />{dashboard ? <div className="stats-grid"><Stat label="Produits" value={dashboard.products} /><Stat label="Produits actifs" value={dashboard.active_products} /><Stat label="Stock faible" value={dashboard.low_stock_products} accent /><Stat label="Utilisateurs" value={dashboard.users} /><Stat label="Equipe support" value={supportUsers?.total || 0} /><Stat label="Commandes" value={dashboard.orders} /><Stat label="En attente" value={dashboard.pending_orders} accent /><Stat label="Revenu COD" value={money(dashboard.revenue_mad)} /></div> : <div className="page-loading">Chargement...</div>}</>}
 
@@ -239,6 +240,8 @@ export default function AdminPage() {
     {tab === "orchestrator" && <OrchestratorWorkspace />}
 
     {tab === "analytics" && <AnalyticsAgentWorkspace />}
+
+    {tab === "stock-forecast" && <StockForecastWorkspace />}
 
     {tab === "marketing" && <MarketingAgentWorkspace />}
 

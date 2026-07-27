@@ -26,6 +26,10 @@ const examples = [
     message: "Analyse les ventes des 30 derniers jours",
     taskType: "analytics",
   },
+  {
+    message: "Prévois les risques de rupture de stock",
+    taskType: "stock_forecast",
+  },
 ];
 
 export function OrchestratorWorkspace() {
@@ -138,6 +142,7 @@ export function OrchestratorWorkspace() {
                 <option value="content">Content Agent</option>
                 <option value="marketing">Marketing Agent</option>
                 <option value="analytics">Analytics Agent</option>
+                <option value="stock_forecast">Stock Forecast Agent</option>
               </select>
               <small>
                 Laissez le mode automatique pour que l&apos;Orchestrator sélectionne l&apos;agent adapté.
