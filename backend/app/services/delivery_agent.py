@@ -156,16 +156,17 @@ class DeliveryAgentService:
             if await self.repository.alert_sent_since(item.order_id, since):
                 continue
             title = f"Suivi livraison commande #{item.order_id}"
-            self.operations.add_notification(
-                user_id=item.user_id,
-                notification_type="delivery_alert",
-                title=title,
-                message=(
-                    "Votre commande nécessite un suivi. "
-                    "Notre équipe examine la situation."
-                ),
-                link=f"/orders?order={item.order_id}",
-            )
+            if item.user_id is not None:
+                self.operations.add_notification(
+                    user_id=item.user_id,
+                    notification_type="delivery_alert",
+                    title=title,
+                    message=(
+                        "Votre commande nécessite un suivi. "
+                        "Notre équipe examine la situation."
+                    ),
+                    link=f"/orders?order={item.order_id}",
+                )
             for role in ("support", "admin"):
                 self.operations.add_notification(
                     target_role=role,

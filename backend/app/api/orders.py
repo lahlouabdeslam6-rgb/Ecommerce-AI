@@ -6,7 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import get_current_user
 from app.db.sqlite import get_sqlite_session
 from app.models.user import User
-from app.schemas.order import CheckoutRequest, OrderListResponse, OrderResponse
+from app.schemas.order import (
+    CheckoutRequest,
+    GuestCheckoutRequest,
+    GuestCheckoutResponse,
+    GuestOrderTrackRequest,
+    OrderListResponse,
+    OrderResponse,
+)
 from app.services.order import OrderService
 
 
@@ -19,7 +26,30 @@ async def checkout(
     user: Annotated[User, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_sqlite_session)],
 ) -> OrderResponse:
-    return await OrderService(session).checkout(user.id, data)
+    return await OrderService(session).checkout(user.id, user.email, data)
+
+
+@router.post(
+    "/guest-checkout",
+    response_model=GuestCheckoutResponse,
+    status_code=201,
+)
+async def guest_checkout(
+    data: GuestCheckoutRequest,
+    session: Annotated[AsyncSession, Depends(get_sqlite_session)],
+) -> GuestCheckoutResponse:
+    return await OrderService(session).guest_checkout(data)
+
+
+@router.post("/guest-track", response_model=OrderResponse)
+async def guest_track(
+    data: GuestOrderTrackRequest,
+    session: Annotated[AsyncSession, Depends(get_sqlite_session)],
+) -> OrderResponse:
+    return await OrderService(session).track_guest_order(
+        data.order_id,
+        data.tracking_token,
+    )
 
 
 @router.get("", response_model=OrderListResponse)

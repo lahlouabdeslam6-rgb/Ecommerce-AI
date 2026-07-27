@@ -8,6 +8,7 @@ type DeliveryItem = {
   order_id: number;
   customer_name: string;
   customer_email: string;
+  phone: string;
   city: string;
   order_status: string;
   age_hours: number;
@@ -178,7 +179,10 @@ export function DeliveryAgentWorkspace() {
                     </span>
                     <div>
                       <strong>Commande #{item.order_id} · {item.customer_name}</strong>
-                      <small>{item.customer_email} · {item.city}</small>
+                      <small>
+                        {item.customer_email} · {item.city} ·{" "}
+                        <a href={`tel:${item.phone}`}>{item.phone}</a>
+                      </small>
                       <p>{item.reason}</p>
                     </div>
                     <div>
@@ -200,4 +204,3 @@ export function DeliveryAgentWorkspace() {
     </section>
   );
 }
-

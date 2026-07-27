@@ -8,7 +8,7 @@ SQLite, Redis, Qdrant, Ollama, React/Vinext et Docker.
 Le MVP local et l'infrastructure IA sont fonctionnels :
 
 - catalogue, recherche, filtres et tri ;
-- panier et commandes avec paiement a la livraison ;
+- panier invite ou connecte, commande sans compte et paiement a la livraison ;
 - espaces client, support et administration ;
 - gestion des produits, du stock et des photos ;
 - tickets support et notifications ;
@@ -129,6 +129,13 @@ Le Delivery Agent est disponible dans `Administration > Livraisons AI`.
 `POST /api/admin/ai/delivery/scan` cree les alertes utiles et alimente l'outbox
 email/WhatsApp. Une meme commande n'est pas notifiee deux fois dans les
 24 heures.
+
+Le compte client est facultatif pour commander. Un visiteur conserve son panier
+dans son navigateur, renseigne son email, son telephone et son adresse, puis
+recoit une reference de suivi privee. La commande apparait immediatement dans
+les espaces admin et support avec les coordonnees necessaires a la confirmation
+telephonique. Delivery Agent utilise ensuite ces memes donnees pour le suivi,
+sans transmettre d'informations inutiles a un modele generatif.
 
 Le SEO Agent est disponible dans `Administration > SEO AI`. Il audite tout le
 catalogue, genere une proposition editable et ne l'applique qu'apres validation

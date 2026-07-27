@@ -70,6 +70,8 @@ Assert-True ($paths -contains "/api/admin/ai/delivery/report") "La route Deliver
 Assert-True ($paths -contains "/api/admin/ai/seo/audit") "La route SEO Agent est absente."
 Assert-True ($paths -contains "/api/automations/delivery/scan") "La route n8n Delivery est absente."
 Assert-True ($paths -contains "/api/automations/carts/abandoned") "La route n8n panier abandonne est absente."
+Assert-True ($paths -contains "/api/orders/guest-checkout") "La commande sans compte est absente."
+Assert-True ($paths -contains "/api/orders/guest-track") "Le suivi invite securise est absent."
 
 $homepage = Invoke-FrontendWithRetry -Uri $FrontendUrl
 Assert-True ($homepage.StatusCode -eq 200) "Le frontend ne repond pas."

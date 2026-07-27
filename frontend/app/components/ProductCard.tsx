@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { api, assetUrl, money } from "../lib/api";
+import { addGuestProduct } from "../lib/guest-cart";
 import type { Cart, Product } from "../types";
 import { useAuth } from "./AuthProvider";
 
@@ -10,22 +11,24 @@ export function ProductCard({ product }: { product: Product }) {
   const image = assetUrl(product.images?.[0]);
   const productPath = `/products/${product.product_id}`;
   const detailHref = productPath;
-  const loginHref = `/login?returnTo=${encodeURIComponent(productPath)}`;
 
   const addToCart = async () => {
-    if (!user) {
-      window.location.href = loginHref;
-      return;
-    }
     try {
-      await api<Cart>(
-        "/api/cart/items",
-        {
-          method: "POST",
-          body: JSON.stringify({ product_id: product.product_id, quantity: 1 }),
-        },
-        true,
-      );
+      if (user) {
+        await api<Cart>(
+          "/api/cart/items",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              product_id: product.product_id,
+              quantity: 1,
+            }),
+          },
+          true,
+        );
+      } else {
+        addGuestProduct(product, 1);
+      }
       window.dispatchEvent(new CustomEvent("toast", { detail: "Produit ajouté au panier" }));
     } catch (error) {
       window.dispatchEvent(

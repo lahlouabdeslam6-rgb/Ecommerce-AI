@@ -107,6 +107,7 @@ async def test_repository_aggregates_real_sqlite_orders() -> None:
         session.add(
             Order(
                 user_id=1,
+                email="client@example.com",
                 order_status="delivered",
                 payment_method="card",
                 payment_status="paid",

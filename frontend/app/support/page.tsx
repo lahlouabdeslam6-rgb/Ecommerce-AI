@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Protected } from "../components/Protected";
 import { StatCard as Stat } from "../components/StatCard";
 import { api, money } from "../lib/api";
@@ -13,6 +14,8 @@ const ticketStatuses = ["open", "in_progress", "resolved", "closed"];
 const priorities = ["low", "normal", "high", "urgent"];
 
 export default function SupportPage() {
+  const searchParams = useSearchParams();
+  const requestedTab = searchParams.get("tab");
   const [tab, setTab] = useState<"dashboard" | "tickets" | "orders" | "products">("dashboard");
   const [dashboard, setDashboard] = useState<SupportDashboard | null>(null);
   const [tickets, setTickets] = useState<TicketList | null>(null);
@@ -23,6 +26,12 @@ export default function SupportPage() {
   const [reply, setReply] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (requestedTab === "orders" || requestedTab === "tickets" || requestedTab === "products") {
+      setTab(requestedTab);
+    }
+  }, [requestedTab]);
 
   const load = async () => {
     try {

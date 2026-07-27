@@ -43,6 +43,18 @@ def make_order(
     return order
 
 
+def test_delivery_agent_accepts_guest_order() -> None:
+    order = make_order(9, "pending", 2)
+    order.user_id = None
+    item = DeliveryAgentService._assess_order(
+        order,
+        "invite@example.com",
+        datetime.now(UTC),
+    )
+    assert item.user_id is None
+    assert item.customer_email == "invite@example.com"
+
+
 class FakeDeliveryRepository:
     def __init__(self) -> None:
         self.rows = [
@@ -180,4 +192,3 @@ async def test_orchestrator_routes_admin_to_delivery(
     assert response.detected_intent == "delivery"
     assert response.selected_agents == ["delivery"]
     assert response.results[0].data["read_only"] is True
-

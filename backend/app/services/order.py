@@ -1,3 +1,6 @@
+import hashlib
+import secrets
+
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -6,7 +9,13 @@ from app.repositories.cart import CartRepository
 from app.repositories.order import OrderRepository
 from app.repositories.operations import OperationsRepository
 from app.repositories.product import ProductRepository
-from app.schemas.order import CheckoutRequest, OrderListResponse, OrderResponse
+from app.schemas.order import (
+    CheckoutRequest,
+    GuestCheckoutRequest,
+    GuestCheckoutResponse,
+    OrderListResponse,
+    OrderResponse,
+)
 
 
 ALLOWED_TRANSITIONS: dict[str, set[str]] = {
@@ -28,7 +37,75 @@ class OrderService:
         self.operations = OperationsRepository(session)
         self.product_repository = ProductRepository()
 
-    async def checkout(self, user_id: int, data: CheckoutRequest) -> OrderResponse:
+    async def checkout(
+        self,
+        user_id: int,
+        email: str,
+        data: CheckoutRequest,
+    ) -> OrderResponse:
+        cart_items = await self.cart_repository.list_items(user_id)
+        order = await self._checkout_items(
+            user_id=user_id,
+            email=email,
+            data=data,
+            requested_items=[
+                (item.product_id, item.quantity) for item in cart_items
+            ],
+        )
+        await self.cart_repository.clear(user_id, commit=False)
+        await self.session.commit()
+        return order
+
+    async def guest_checkout(
+        self,
+        data: GuestCheckoutRequest,
+    ) -> GuestCheckoutResponse:
+        tracking_token = secrets.token_urlsafe(32)
+        order = await self._checkout_items(
+            user_id=None,
+            email=str(data.email),
+            data=data,
+            requested_items=[
+                (item.product_id, item.quantity) for item in data.items
+            ],
+            guest_token_hash=self._token_hash(tracking_token),
+        )
+        await self.session.commit()
+        return GuestCheckoutResponse(
+            order=order,
+            tracking_token=tracking_token,
+        )
+
+    async def track_guest_order(
+        self,
+        order_id: int,
+        tracking_token: str,
+    ) -> OrderResponse:
+        order = await self.order_repository.get_by_id(order_id)
+        if (
+            order is None
+            or order.user_id is not None
+            or order.guest_token_hash is None
+            or not secrets.compare_digest(
+                order.guest_token_hash,
+                self._token_hash(tracking_token),
+            )
+        ):
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND,
+                "Commande invitée introuvable",
+            )
+        return OrderResponse.model_validate(order)
+
+    async def _checkout_items(
+        self,
+        *,
+        user_id: int | None,
+        email: str,
+        data: CheckoutRequest,
+        requested_items: list[tuple[int, int]],
+        guest_token_hash: str | None = None,
+    ) -> OrderResponse:
         if data.payment_method == "card" and (
             not data.payment_token
             or not data.payment_token.startswith("demo_")
@@ -38,39 +115,45 @@ class OrderService:
                 status.HTTP_400_BAD_REQUEST,
                 "Card payment could not be authorized",
             )
-        cart_items = await self.cart_repository.list_items(user_id)
-        if not cart_items:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Cart is empty")
+        if not requested_items:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Le panier est vide")
+
+        quantities: dict[int, int] = {}
+        for product_id, quantity in requested_items:
+            quantities[product_id] = min(
+                quantities.get(product_id, 0) + quantity,
+                99,
+            )
 
         products = await self.product_repository.get_many_by_ids(
-            [item.product_id for item in cart_items]
+            list(quantities)
         )
         order_items: list[dict[str, object]] = []
         subtotal = 0.0
 
-        for cart_item in cart_items:
-            product = products.get(cart_item.product_id)
+        for product_id, quantity in quantities.items():
+            product = products.get(product_id)
             if product is None or not product.get("is_active"):
                 raise HTTPException(
                     status.HTTP_409_CONFLICT,
-                    f"Product {cart_item.product_id} is unavailable",
+                    f"Le produit {product_id} est indisponible",
                 )
-            if int(product.get("stock") or 0) < cart_item.quantity:
+            if int(product.get("stock") or 0) < quantity:
                 raise HTTPException(
                     status.HTTP_409_CONFLICT,
-                    f"Insufficient stock for product {cart_item.product_id}",
+                    f"Stock insuffisant pour le produit {product_id}",
                 )
             unit_price = float(product.get("price") or 0)
-            line_subtotal = round(unit_price * cart_item.quantity, 2)
+            line_subtotal = round(unit_price * quantity, 2)
             images = product.get("images") or []
             order_items.append(
                 {
-                    "product_id": cart_item.product_id,
+                    "product_id": product_id,
                     "product_name": product.get("name") or "Unnamed product",
                     "brand": product.get("brand"),
                     "image_url": images[0] if images else None,
                     "unit_price": unit_price,
-                    "quantity": cart_item.quantity,
+                    "quantity": quantity,
                     "subtotal": line_subtotal,
                 }
             )
@@ -78,18 +161,20 @@ class OrderService:
 
         reserved: list[tuple[int, int]] = []
         try:
-            for cart_item in cart_items:
+            for product_id, quantity in quantities.items():
                 if not await self.product_repository.reserve_stock(
-                    cart_item.product_id, cart_item.quantity
+                    product_id, quantity
                 ):
                     raise HTTPException(
                         status.HTTP_409_CONFLICT,
-                        f"Stock changed for product {cart_item.product_id}",
+                        f"Le stock du produit {product_id} a changé",
                     )
-                reserved.append((cart_item.product_id, cart_item.quantity))
+                reserved.append((product_id, quantity))
 
             order = await self.order_repository.create(
                 user_id=user_id,
+                email=email,
+                guest_token_hash=guest_token_hash,
                 shipping=data.model_dump(
                     include={"full_name", "phone", "address", "city", "notes"}
                 ),
@@ -122,30 +207,38 @@ class OrderService:
                 )
             self.operations.add_audit(
                 actor_id=user_id,
-                actor_role="customer",
+                actor_role="customer" if user_id is not None else "guest",
                 action="order.created",
                 entity_type="order",
                 entity_id=order.id,
-                details={"total": order.total, "payment_method": order.payment_method},
+                details={
+                    "total": order.total,
+                    "payment_method": order.payment_method,
+                    "guest": user_id is None,
+                },
+            )
+            confirmation_message = (
+                f"Commande #{order.id} à confirmer par téléphone : "
+                f"{order.full_name}, {order.phone}, {order.city}"
             )
             self.operations.add_notification(
                 target_role="admin",
                 notification_type="new_order",
-                title="Nouvelle commande",
-                message=f"Commande #{order.id} creee ({order.total} MAD)",
-                link=f"/admin?order={order.id}",
+                title="Nouvelle commande à confirmer",
+                message=f"{confirmation_message} ({order.total} MAD)",
+                link=f"/admin?tab=orders&order={order.id}",
             )
             self.operations.add_notification(
                 target_role="support",
                 notification_type="new_order",
-                title="Nouvelle commande",
-                message=f"Commande #{order.id} creee",
-                link=f"/support?order={order.id}",
+                title="Nouvelle commande à confirmer",
+                message=confirmation_message,
+                link=f"/support?tab=orders&order={order.id}",
             )
-            await self.cart_repository.clear(user_id, commit=False)
-            await self.session.commit()
+            await self.session.flush()
             saved_order = await self.order_repository.get_by_id(
-                order.id, user_id=user_id
+                order.id,
+                user_id=user_id,
             )
             if saved_order is None:
                 raise RuntimeError("Order was not saved")
@@ -155,6 +248,10 @@ class OrderService:
             for product_id, quantity in reserved:
                 await self.product_repository.restore_stock(product_id, quantity)
             raise
+
+    @staticmethod
+    def _token_hash(value: str) -> str:
+        return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
     async def list_orders(
         self,
@@ -237,13 +334,14 @@ class OrderService:
             entity_id=order.id,
             details={"before": previous_status, "after": new_status},
         )
-        self.operations.add_notification(
-            user_id=order.user_id,
-            notification_type="order_status",
-            title="Mise a jour commande",
-            message=f"Commande #{order.id}: {new_status}",
-            link=f"/orders?order={order.id}",
-        )
+        if order.user_id is not None:
+            self.operations.add_notification(
+                user_id=order.user_id,
+                notification_type="order_status",
+                title="Mise a jour commande",
+                message=f"Commande #{order.id}: {new_status}",
+                link=f"/orders?order={order.id}",
+            )
         updated = await self.order_repository.update_status(order, new_status)
         return OrderResponse.model_validate(updated)
 

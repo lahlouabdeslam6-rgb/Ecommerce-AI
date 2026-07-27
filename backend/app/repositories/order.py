@@ -14,7 +14,9 @@ class OrderRepository:
     async def create(
         self,
         *,
-        user_id: int,
+        user_id: int | None,
+        email: str,
+        guest_token_hash: str | None = None,
         shipping: dict[str, str | None],
         items: list[dict[str, object]],
         subtotal: float,
@@ -27,6 +29,8 @@ class OrderRepository:
     ) -> Order:
         order = Order(
             user_id=user_id,
+            email=email.strip().lower(),
+            guest_token_hash=guest_token_hash,
             full_name=str(shipping["full_name"]),
             phone=str(shipping["phone"]),
             address=str(shipping["address"]),

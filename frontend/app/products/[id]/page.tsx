@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { RecommendationSection } from "../../components/RecommendationSection";
 import { useAuth } from "../../components/AuthProvider";
 import { api, assetUrl, money } from "../../lib/api";
+import { addGuestProduct } from "../../lib/guest-cart";
 import type { Cart, Product } from "../../types";
 
 export default function ProductDetailPage() {
@@ -22,22 +23,22 @@ export default function ProductDetailPage() {
   }, [params.id]);
 
   const add = async () => {
-    if (!user) {
-      router.push(`/login?returnTo=/products/${params.id}`);
-      return;
-    }
     try {
-      await api<Cart>(
-        "/api/cart/items",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            product_id: product?.product_id,
-            quantity,
-          }),
-        },
-        true,
-      );
+      if (user) {
+        await api<Cart>(
+          "/api/cart/items",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              product_id: product?.product_id,
+              quantity,
+            }),
+          },
+          true,
+        );
+      } else if (product) {
+        addGuestProduct(product, quantity);
+      }
       router.push("/cart");
     } catch (requestError) {
       setError((requestError as Error).message);

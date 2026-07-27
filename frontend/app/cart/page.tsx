@@ -2,26 +2,59 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Protected } from "../components/Protected";
 import { RecommendationSection } from "../components/RecommendationSection";
+import { useAuth } from "../components/AuthProvider";
 import { api, assetUrl, money } from "../lib/api";
+import {
+  clearGuestCart,
+  getGuestCart,
+  removeGuestProduct,
+  updateGuestQuantity,
+} from "../lib/guest-cart";
 import type { Cart } from "../types";
 
 export default function CartPage() {
+  const { user, loading } = useAuth();
   const [cart, setCart] = useState<Cart | null>(null);
   const [error, setError] = useState("");
 
-  const load = () =>
-    api<Cart>("/api/cart", {}, true)
-      .then(setCart)
-      .catch((requestError: Error) => setError(requestError.message));
+  const load = async () => {
+    if (!user) {
+      setCart(getGuestCart());
+      return;
+    }
+    try {
+      const guestCart = getGuestCart();
+      for (const item of guestCart.items) {
+        await api<Cart>(
+          "/api/cart/items",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              product_id: item.product_id,
+              quantity: item.quantity,
+            }),
+          },
+          true,
+        );
+      }
+      if (guestCart.items.length) clearGuestCart();
+      setCart(await api<Cart>("/api/cart", {}, true));
+    } catch (requestError) {
+      setError((requestError as Error).message);
+    }
+  };
 
   useEffect(() => {
-    void load();
-  }, []);
+    if (!loading) void load();
+  }, [loading, user]);
 
   const update = async (productId: number, quantity: number) => {
     try {
+      if (!user) {
+        setCart(updateGuestQuantity(productId, quantity));
+        return;
+      }
       setCart(
         await api<Cart>(
           `/api/cart/items/${productId}`,
@@ -39,6 +72,10 @@ export default function CartPage() {
 
   const remove = async (productId: number) => {
     try {
+      if (!user) {
+        setCart(removeGuestProduct(productId));
+        return;
+      }
       setCart(
         await api<Cart>(
           `/api/cart/items/${productId}`,
@@ -52,8 +89,7 @@ export default function CartPage() {
   };
 
   return (
-    <Protected>
-      <>
+    <>
         <section className="shell page-section">
           <div className="page-title">
             <div>
@@ -156,14 +192,15 @@ export default function CartPage() {
           )}
         </section>
 
-        <RecommendationSection
-          endpoint="/api/recommendations/cart"
-          title="Une selection construite pour toi"
-          subtitle="Le classement utilise ton panier, tes commandes precedentes, ton objectif et ton budget."
-          authenticated
-          interactive
-        />
+        {user && (
+          <RecommendationSection
+            endpoint="/api/recommendations/cart"
+            title="Une selection construite pour toi"
+            subtitle="Le classement utilise ton panier, tes commandes precedentes, ton objectif et ton budget."
+            authenticated
+            interactive
+          />
+        )}
       </>
-    </Protected>
   );
 }

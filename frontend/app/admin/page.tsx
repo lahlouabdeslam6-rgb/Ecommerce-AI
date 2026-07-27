@@ -75,7 +75,7 @@ export default function AdminPage() {
   useEffect(() => { void load(); }, [user]);
 
   useEffect(() => {
-    if (requestedTab === "messages") setTab("messages");
+    if (requestedTab === "messages" || requestedTab === "orders") setTab(requestedTab);
   }, [requestedTab]);
 
   useEffect(() => {

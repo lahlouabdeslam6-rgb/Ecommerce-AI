@@ -70,6 +70,7 @@ def cleanup() -> None:
     customer_id = created.get("customer")
     support_id = created.get("support")
     order_id = created.get("order")
+    guest_order_id = created.get("guest_order")
     ticket_id = created.get("ticket")
     user_ids = [value for value in (customer_id, support_id) if value]
 
@@ -78,9 +79,10 @@ def cleanup() -> None:
             "DELETE FROM support_messages WHERE ticket_id = ?", (ticket_id,)
         )
         connection.execute("DELETE FROM support_tickets WHERE id = ?", (ticket_id,))
-    if order_id:
-        connection.execute("DELETE FROM order_items WHERE order_id = ?", (order_id,))
-        connection.execute("DELETE FROM orders WHERE id = ?", (order_id,))
+    for value in (order_id, guest_order_id):
+        if value:
+            connection.execute("DELETE FROM order_items WHERE order_id = ?", (value,))
+            connection.execute("DELETE FROM orders WHERE id = ?", (value,))
     for user_id in user_ids:
         connection.execute("DELETE FROM cart_items WHERE user_id = ?", (user_id,))
         connection.execute("DELETE FROM notifications WHERE user_id = ?", (user_id,))
@@ -95,6 +97,7 @@ def cleanup() -> None:
         )
     for entity_type, entity_id in (
         ("order", order_id),
+        ("order", guest_order_id),
         ("ticket", ticket_id),
         ("user", customer_id),
         ("user", support_id),
@@ -104,11 +107,12 @@ def cleanup() -> None:
                 "DELETE FROM audit_logs WHERE entity_type = ? AND entity_id = ?",
                 (entity_type, str(entity_id)),
             )
-    if order_id:
-        connection.execute(
-            "DELETE FROM notifications WHERE link LIKE ? OR message LIKE ?",
-            (f"%order={order_id}%", f"%#{order_id}%"),
-        )
+    for value in (order_id, guest_order_id):
+        if value:
+            connection.execute(
+                "DELETE FROM notifications WHERE link LIKE ? OR message LIKE ?",
+                (f"%order={value}%", f"%#{value}%"),
+            )
     if ticket_id:
         connection.execute(
             "DELETE FROM notifications WHERE link LIKE ? OR message LIKE ?",
@@ -286,6 +290,74 @@ try:
         "remove product image",
     )
     assert len(product["images"]) == 1
+
+    guest_checkout = expect(
+        client.post(
+            "/api/orders/guest-checkout",
+            json={
+                "email": f"qa-guest-{STAMP}@example.com",
+                "full_name": "QA Guest",
+                "phone": "0622334455",
+                "address": "Guest Address 45",
+                "city": "Rabat",
+                "notes": "Guest checkout QA",
+                "payment_method": "cash_on_delivery",
+                "items": [{"product_id": product_id, "quantity": 1}],
+            },
+        ),
+        201,
+        "guest checkout without account",
+    )
+    guest_order = guest_checkout["order"]
+    created["guest_order"] = guest_order["id"]
+    assert guest_order["user_id"] is None
+    assert guest_order["email"].startswith("qa-guest-")
+    expect(
+        client.post(
+            "/api/orders/guest-track",
+            json={
+                "order_id": guest_order["id"],
+                "tracking_token": guest_checkout["tracking_token"],
+            },
+        ),
+        200,
+        "guest tracks order with private token",
+    )
+    expect(
+        client.post(
+            "/api/orders/guest-track",
+            json={
+                "order_id": guest_order["id"],
+                "tracking_token": "wrong-token-value-12345678901234567890",
+            },
+        ),
+        404,
+        "guest tracking rejects wrong token",
+    )
+    support_guest_orders = expect(
+        client.get(
+            "/api/support/orders?page_size=100",
+            headers=support_headers,
+        ),
+        200,
+        "support sees guest delivery details",
+    )
+    visible_guest = next(
+        item
+        for item in support_guest_orders["items"]
+        if item["id"] == guest_order["id"]
+    )
+    assert visible_guest["phone"] == "0622334455"
+    assert visible_guest["address"] == "Guest Address 45"
+    expect(
+        client.patch(
+            f"/api/admin/orders/{guest_order['id']}/status",
+            headers=admin_headers,
+            json={"order_status": "cancelled"},
+        ),
+        200,
+        "admin cancels temporary guest order",
+    )
 
     customer = expect(
         client.post(

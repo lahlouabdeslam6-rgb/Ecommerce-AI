@@ -14,11 +14,11 @@ class DeliveryRepository:
 
     async def active_orders(self) -> list[tuple[Order, str]]:
         result = await self.session.execute(
-            select(Order, User.email)
-            .join(User, User.id == Order.user_id)
+            select(Order, Order.email)
+            .outerjoin(User, User.id == Order.user_id)
             .where(
                 Order.order_status.not_in({"delivered", "cancelled"}),
-                User.is_deleted.is_(False),
+                (User.id.is_(None)) | (User.is_deleted.is_(False)),
             )
             .order_by(Order.created_at)
         )
@@ -40,4 +40,3 @@ class DeliveryRepository:
             .limit(1)
         )
         return result.scalar_one_or_none() is not None
-

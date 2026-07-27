@@ -37,7 +37,7 @@ test("server-renders the NUTRIFIT premium homepage", async () => {
   assert.match(html, /href="\/login"/);
   assert.match(html, /href="\/register"/);
   assert.match(html, /header-actions guest-actions/);
-  assert.doesNotMatch(html, /href="\/cart"/);
+  assert.match(html, /href="\/cart"/);
   assert.doesNotMatch(html, /href="\/orders"/);
   assert.doesNotMatch(html, /href="\/help"/);
   assert.doesNotMatch(html, /href="\/account"/);
@@ -45,15 +45,16 @@ test("server-renders the NUTRIFIT premium homepage", async () => {
   assert.doesNotMatch(html, /Ecommerce AI|Starter Project/i);
 });
 
-test("anonymous visitors can inspect products before sign-in", async () => {
+test("anonymous visitors can inspect products and use a guest cart", async () => {
   const [cardSource, detailSource] = await Promise.all([
     readFile(new URL("../app/components/ProductCard.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/products/[id]/page.tsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(cardSource, /const detailHref = productPath/);
-  assert.match(cardSource, /const loginHref = `\/login\?returnTo=/);
-  assert.match(detailSource, /if \(!user\)[\s\S]*router\.push\(`\/login\?returnTo=/);
+  assert.match(cardSource, /addGuestProduct\(product, 1\)/);
+  assert.match(detailSource, /addGuestProduct\(product, quantity\)/);
+  assert.doesNotMatch(cardSource, /login\?returnTo=/);
   assert.doesNotMatch(detailSource, /router\.replace\(`\/login\?returnTo=/);
 });
 
@@ -99,7 +100,7 @@ test("checkout exposes COD and card payment without persisting sensitive fields"
 
   const html = await response.text();
   assert.match(html, /NUTRIFIT \| Nutrition &amp; Performance/);
-  assert.match(html, /Chargement de votre espace/);
+  assert.doesNotMatch(html, /Chargement de votre espace/);
 
   const checkoutSource = await readFile(
     new URL("../app/checkout/page.tsx", import.meta.url),
@@ -108,6 +109,10 @@ test("checkout exposes COD and card payment without persisting sensitive fields"
   assert.match(checkoutSource, /Livraison & paiement/);
   assert.match(checkoutSource, /Paiement a la livraison/);
   assert.match(checkoutSource, /Carte bancaire/);
+  assert.match(checkoutSource, /Le compte est facultatif/);
+  assert.match(checkoutSource, /\/api\/orders\/guest-checkout/);
+  assert.match(checkoutSource, /\/api\/orders\/guest-track/);
+  assert.match(checkoutSource, /va vous appeler/);
   assert.match(checkoutSource, /aucun debit reel/i);
   assert.match(checkoutSource, /card_last4/);
   assert.match(checkoutSource, /payment_token/);

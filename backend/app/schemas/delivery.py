@@ -9,7 +9,7 @@ DeliveryRisk = Literal["normal", "warning", "critical", "failed"]
 
 class DeliveryOrderItem(BaseModel):
     order_id: int
-    user_id: int
+    user_id: int | None
     customer_name: str
     customer_email: str
     phone: str

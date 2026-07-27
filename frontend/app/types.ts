@@ -84,7 +84,8 @@ export type Cart = {
 
 export type Order = {
   id: number;
-  user_id: number;
+  user_id: number | null;
+  email: string;
   order_status: string;
   payment_method: string;
   payment_status: string;
@@ -111,6 +112,11 @@ export type Order = {
     quantity: number;
     subtotal: number;
   }>;
+};
+
+export type GuestCheckoutResponse = {
+  order: Order;
+  tracking_token: string;
 };
 
 export type PaginatedOrders = {

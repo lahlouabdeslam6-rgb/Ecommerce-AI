@@ -86,6 +86,8 @@ RATE_LIMITED_PATHS: dict[str, tuple[int, int]] = {
     "/api/auth/register": (5, 300),
     "/api/auth/forgot-password": (5, 300),
     "/api/auth/reset-password": (5, 300),
+    "/api/orders/guest-checkout": (5, 300),
+    "/api/orders/guest-track": (30, 300),
 }
 STARTED_AT = perf_counter()
 REQUEST_METRICS = {"requests": 0, "errors": 0, "total_duration_ms": 0.0}

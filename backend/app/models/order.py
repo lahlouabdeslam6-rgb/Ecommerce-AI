@@ -10,9 +10,14 @@ class Order(Base):
     __tablename__ = "orders"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="RESTRICT"),
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
         index=True,
+    )
+    email: Mapped[str] = mapped_column(String(320), index=True)
+    guest_token_hash: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, unique=True
     )
     order_status: Mapped[str] = mapped_column(
         String(30), default="pending", index=True

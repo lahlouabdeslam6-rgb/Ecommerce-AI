@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class CheckoutRequest(BaseModel):
@@ -13,6 +13,21 @@ class CheckoutRequest(BaseModel):
     card_last4: str | None = Field(default=None, pattern=r"^\d{4}$")
     card_brand: str | None = Field(default=None, max_length=30)
     payment_token: str | None = Field(default=None, min_length=8, max_length=200)
+
+
+class GuestCartItemInput(BaseModel):
+    product_id: int = Field(gt=0)
+    quantity: int = Field(ge=1, le=99)
+
+
+class GuestCheckoutRequest(CheckoutRequest):
+    email: EmailStr
+    items: list[GuestCartItemInput] = Field(min_length=1, max_length=50)
+
+
+class GuestOrderTrackRequest(BaseModel):
+    order_id: int = Field(gt=0)
+    tracking_token: str = Field(min_length=32, max_length=200)
 
 
 class OrderItemResponse(BaseModel):
@@ -31,7 +46,8 @@ class OrderResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    user_id: int
+    user_id: int | None
+    email: str
     order_status: str
     payment_method: str
     payment_status: str
@@ -58,6 +74,11 @@ class OrderListResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
+
+
+class GuestCheckoutResponse(BaseModel):
+    order: OrderResponse
+    tracking_token: str
 
 
 class OrderStatusUpdate(BaseModel):
