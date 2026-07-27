@@ -56,12 +56,7 @@ class ContentAgentService:
         self.session = session
         self.repository = ContentRepository(session)
 
-    async def generate(
-        self,
-        data: ContentGenerateRequest,
-        *,
-        created_by: int,
-    ) -> ContentResponse:
+    async def preview(self, data: ContentGenerateRequest) -> ContentGeneratedFields:
         infrastructure = await AIInfrastructureService().status()
         if infrastructure.ollama != "healthy" or not infrastructure.models_ready:
             raise HTTPException(
@@ -107,7 +102,7 @@ class ContentAgentService:
         )
         raw = await self._request_generation(prompt)
         try:
-            generated = self._normalize_generated(raw, data)
+            return self._normalize_generated(raw, data)
         except HTTPException:
             logger.warning(
                 "Invalid first Content Agent response for topic=%s; retrying",
@@ -118,7 +113,15 @@ class ContentAgentService:
                 "Retourne uniquement le JSON corrige, sans markdown:\n"
                 f"{raw[:5000]}"
             )
-            generated = self._normalize_generated(raw, data)
+            return self._normalize_generated(raw, data)
+
+    async def generate(
+        self,
+        data: ContentGenerateRequest,
+        *,
+        created_by: int,
+    ) -> ContentResponse:
+        generated = await self.preview(data)
 
         item = await self.repository.create(
             {

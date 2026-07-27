@@ -249,3 +249,41 @@ test("Recommendation Agent appears on product detail and cart", async () => {
   assert.match(recommendationSource, /Qdrant \+ catalogue/);
   assert.match(recommendationSource, /result\.disclaimer/);
 });
+
+test("customer AI assistant routes requests through the Orchestrator", async () => {
+  const [layoutSource, assistantSource, resultSource] = await Promise.all([
+    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/components/AIShoppingAssistant.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/components/OrchestratorResult.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
+  assert.match(layoutSource, /AIShoppingAssistant/);
+  assert.match(assistantSource, /user\?\.role !== "customer"/);
+  assert.match(assistantSource, /\/api\/orchestrator\/execute/);
+  assert.match(assistantSource, /Bghit creatine ta7t 300 MAD/);
+  assert.match(resultSource, /Recommendation Agent/);
+  assert.match(resultSource, /Safety Agent/);
+  assert.match(resultSource, /\/products\/\$\{productId\}/);
+});
+
+test("admin AI Orchestrator exposes routing, safety and persistent history", async () => {
+  const [adminSource, workspaceSource] = await Promise.all([
+    readFile(new URL("../app/admin/page.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/admin/OrchestratorWorkspace.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
+  assert.match(adminSource, /\["orchestrator", "AI Orchestrator"\]/);
+  assert.match(adminSource, /OrchestratorWorkspace/);
+  assert.match(workspaceSource, /\/api\/orchestrator\/execute/);
+  assert.match(workspaceSource, /\/api\/orchestrator\/history\?page_size=40/);
+  assert.match(workspaceSource, /Historique Orchestrator/);
+  assert.match(workspaceSource, /Preview \+ Safety/);
+  assert.match(workspaceSource, /actor_email/);
+});

@@ -66,12 +66,7 @@ class MarketingAgentService:
         self.session = session
         self.repository = MarketingRepository(session)
 
-    async def generate(
-        self,
-        data: MarketingGenerateRequest,
-        *,
-        created_by: int,
-    ) -> MarketingCampaignResponse:
+    async def preview(self, data: MarketingGenerateRequest) -> MarketingGeneratedFields:
         infrastructure = await AIInfrastructureService().status()
         if infrastructure.ollama != "healthy" or not infrastructure.models_ready:
             raise HTTPException(
@@ -118,7 +113,7 @@ class MarketingAgentService:
         )
         raw = await self._request_generation(prompt)
         try:
-            generated = self._normalize_generated(raw, data)
+            return self._normalize_generated(raw, data)
         except HTTPException:
             logger.warning(
                 "Invalid first Marketing Agent response for topic=%s; retrying",
@@ -129,7 +124,15 @@ class MarketingAgentService:
                 "avec toutes les cles demandees, sans markdown:\n"
                 f"{raw[:6000]}"
             )
-            generated = self._normalize_generated(repaired, data)
+            return self._normalize_generated(repaired, data)
+
+    async def generate(
+        self,
+        data: MarketingGenerateRequest,
+        *,
+        created_by: int,
+    ) -> MarketingCampaignResponse:
+        generated = await self.preview(data)
 
         campaign = await self.repository.create(
             {

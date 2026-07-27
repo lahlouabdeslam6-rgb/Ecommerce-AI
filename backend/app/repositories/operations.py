@@ -100,6 +100,29 @@ class OperationsRepository:
         )
         return [(row[0], row[1]) for row in result.all()], total
 
+    async def list_orchestrator_runs(
+        self,
+        page: int,
+        page_size: int,
+    ) -> tuple[list[tuple[AuditLog, str | None]], int]:
+        condition = AuditLog.entity_type == "ai_orchestrator"
+        total = int(
+            (
+                await self.session.execute(
+                    select(func.count(AuditLog.id)).where(condition)
+                )
+            ).scalar_one()
+        )
+        result = await self.session.execute(
+            select(AuditLog, User.email)
+            .outerjoin(User, User.id == AuditLog.actor_id)
+            .where(condition)
+            .order_by(AuditLog.created_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        return [(row[0], row[1]) for row in result.all()], total
+
     async def list_stock(
         self, page: int, page_size: int, product_id: int | None = None
     ) -> tuple[list[StockMovement], int]:

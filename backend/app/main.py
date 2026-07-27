@@ -23,6 +23,7 @@ from app.api.operations import router as operations_router
 from app.api.products import router as products_router
 from app.api.recommendations import router as recommendations_router
 from app.api.support import router as support_router
+from app.api.orchestrator import router as orchestrator_router
 from app.api.tickets import router as tickets_router
 from app.core.config import settings
 from app.core.rate_limit import rate_limiter
@@ -135,6 +136,7 @@ app.include_router(operations_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
 app.include_router(tickets_router, prefix="/api")
 app.include_router(support_router, prefix="/api")
+app.include_router(orchestrator_router, prefix="/api")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 

@@ -28,6 +28,17 @@ class SafetyAIResult(BaseModel):
     confidence: float = Field(ge=0, le=1)
 
 
+class SafetyAssessmentResponse(BaseModel):
+    """Read-only Safety Agent result that is not persisted."""
+
+    status: Literal["safe", "warning", "blocked"]
+    risk_level: Literal["low", "medium", "high"]
+    reasons: list[str] = Field(default_factory=list, max_length=10)
+    recommendations: list[str] = Field(default_factory=list, max_length=10)
+    matched_rules: list[str] = Field(default_factory=list, max_length=10)
+    model: str
+
+
 class SafetyReviewResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

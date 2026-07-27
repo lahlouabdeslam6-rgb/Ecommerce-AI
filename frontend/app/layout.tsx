@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { AuthProvider } from "./components/AuthProvider";
+import { AIShoppingAssistant } from "./components/AIShoppingAssistant";
 import { Header } from "./components/Header";
 import { Toast } from "./components/Toast";
 import "./globals.css";
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <AuthProvider>
           <Header />
           <main>{children}</main>
+          <AIShoppingAssistant />
           <Toast />
         </AuthProvider>
       </body>

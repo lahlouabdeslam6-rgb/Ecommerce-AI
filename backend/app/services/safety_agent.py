@@ -18,6 +18,7 @@ from app.repositories.operations import OperationsRepository
 from app.repositories.safety import SafetyRepository
 from app.schemas.safety import (
     SafetyAIResult,
+    SafetyAssessmentResponse,
     SafetyReviewListResponse,
     SafetyReviewResponse,
 )
@@ -143,17 +144,13 @@ class SafetyAgentService:
         self.repository = SafetyRepository(session)
         self.operations = OperationsRepository(session)
 
-    async def review(
+    async def assess(
         self,
         text: str,
         *,
-        source_type: str,
-        source_id: str | int | None,
-        action: str,
-        actor_id: int | None,
-        actor_role: str,
         use_ai: bool = True,
-    ) -> SafetyReviewResponse:
+    ) -> SafetyAssessmentResponse:
+        """Evaluate content without writing a review or audit record."""
         rule_result = self._rule_review(text)
         semantic_result: SafetyAIResult | None = None
         ai_unavailable = False
@@ -166,6 +163,27 @@ class SafetyAgentService:
             semantic_result,
             ai_unavailable=ai_unavailable,
         )
+        return SafetyAssessmentResponse(
+            **merged,
+            model=(
+                f"rules+{settings.ollama_chat_model}"
+                if semantic_result is not None
+                else "rules"
+            ),
+        )
+
+    async def review(
+        self,
+        text: str,
+        *,
+        source_type: str,
+        source_id: str | int | None,
+        action: str,
+        actor_id: int | None,
+        actor_role: str,
+        use_ai: bool = True,
+    ) -> SafetyReviewResponse:
+        assessment = await self.assess(text, use_ai=use_ai)
         report = await self.repository.create(
             {
                 "source_type": source_type,
@@ -173,17 +191,13 @@ class SafetyAgentService:
                     str(source_id) if source_id is not None else None
                 ),
                 "action": action,
-                "status": merged["status"],
-                "risk_level": merged["risk_level"],
-                "reasons": merged["reasons"],
-                "recommendations": merged["recommendations"],
-                "matched_rules": merged["matched_rules"],
+                "status": assessment.status,
+                "risk_level": assessment.risk_level,
+                "reasons": assessment.reasons,
+                "recommendations": assessment.recommendations,
+                "matched_rules": assessment.matched_rules,
                 "excerpt": self._excerpt(text),
-                "model": (
-                    f"rules+{settings.ollama_chat_model}"
-                    if semantic_result is not None
-                    else "rules"
-                ),
+                "model": assessment.model,
                 "actor_id": actor_id,
             }
         )

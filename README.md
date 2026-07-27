@@ -31,9 +31,12 @@ Le MVP local et l'infrastructure IA sont fonctionnels :
 - Recommendation Agent avec suggestions similaires sur les fiches produits,
   personnalisation par panier, commandes, objectif et budget, Qdrant avec
   fallback MongoDB, uniquement sur les produits actifs et disponibles.
+- AI Orchestrator avec detection d'intention en francais, anglais et darija
+  latine, coordination Product, Recommendation, Content, Marketing et Safety,
+  assistant client et espace de supervision admin avec historique.
 
-Le paiement reel, l'envoi d'emails reel et les agents metier IA sont prevus
-dans les prochaines phases.
+Le paiement reel, l'envoi d'emails reel et les agents Support, Analytics,
+Stock Forecast et Delivery sont prevus dans les prochaines phases.
 
 ## Demarrage local
 
@@ -87,6 +90,15 @@ une promesse medicale dangereuse bloque l'action avant toute modification.
 Le Recommendation Agent apparait sous les fiches produits et dans le panier.
 Il classe les produits disponibles avec Qdrant et les donnees du catalogue. Le
 client connecte peut aussi choisir un objectif et un budget maximum par produit.
+
+L'AI Orchestrator est disponible avec `POST /api/orchestrator/execute`. Le
+client connecte utilise l'assistant flottant pour chercher des produits selon
+son objectif et son budget. L'admin dispose de `Administration > AI
+Orchestrator` pour tester le routing, consulter les resultats des agents et la
+decision Safety. `GET /api/orchestrator/history` est reserve a l'admin et
+retourne l'historique trace dans les audit logs. Les actions de modification,
+publication et envoi restent en mode proposition : aucune action metier n'est
+executee automatiquement.
 
 ## Tests
 
