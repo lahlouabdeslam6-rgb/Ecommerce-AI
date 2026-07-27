@@ -60,6 +60,66 @@ function ChangeBadge({ value }: { value: number }) {
   );
 }
 
+function ComparisonRow({
+  label,
+  current,
+  previous,
+  format,
+}: {
+  label: string;
+  current: number;
+  previous: number;
+  format: (value: number) => string;
+}) {
+  const maximum = Math.max(current, previous, 1);
+  const currentWidth = current > 0 ? Math.max(4, (current / maximum) * 100) : 0;
+  const previousWidth = previous > 0 ? Math.max(4, (previous / maximum) * 100) : 0;
+  return (
+    <div className="analytics-compare-row">
+      <strong>{label}</strong>
+      <div>
+        <span>Actuelle</span>
+        <div className="analytics-track">
+          <i className="current" style={{ width: `${currentWidth}%` }} />
+        </div>
+        <b>{format(current)}</b>
+      </div>
+      <div>
+        <span>Précédente</span>
+        <div className="analytics-track">
+          <i className="previous" style={{ width: `${previousWidth}%` }} />
+        </div>
+        <b>{format(previous)}</b>
+      </div>
+    </div>
+  );
+}
+
+function StatusRow({
+  label,
+  value,
+  total,
+  state,
+}: {
+  label: string;
+  value: number;
+  total: number;
+  state: "success" | "pending" | "danger";
+}) {
+  const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+  return (
+    <div className="analytics-status-row">
+      <div>
+        <span>{label}</span>
+        <b>{value} · {percentage} %</b>
+      </div>
+      <div className="analytics-track">
+        <i className={state} style={{ width: `${percentage}%` }} />
+      </div>
+    </div>
+  );
+}
+
 export function AnalyticsAgentWorkspace() {
   const [periodDays, setPeriodDays] = useState(30);
   const [report, setReport] = useState<AnalyticsReport | null>(null);
@@ -109,6 +169,10 @@ export function AnalyticsAgentWorkspace() {
 
   const maxDailyRevenue = useMemo(
     () => Math.max(...(report?.daily_sales.map((item) => item.revenue_mad) || [0]), 1),
+    [report],
+  );
+  const maxProductQuantity = useMemo(
+    () => Math.max(...(report?.top_products.map((item) => item.quantity) || [0]), 1),
     [report],
   );
 
@@ -198,32 +262,74 @@ export function AnalyticsAgentWorkspace() {
             </article>
           </div>
 
-          <div className="analytics-insight-grid">
-            <section className="panel">
+          <div className="analytics-visual-grid">
+            <section className="panel analytics-comparison-panel">
               <div className="analytics-section-head">
                 <div>
-                  <p className="kicker">Observations</p>
-                  <h3>Points clés</h3>
+                  <p className="kicker">Comparaison simple</p>
+                  <h3>Période actuelle / précédente</h3>
                 </div>
               </div>
-              <ul className="analytics-list">
-                {report.insights.map((item) => <li key={item}>{item}</li>)}
-              </ul>
+              <div className="analytics-legend">
+                <span><i className="current" />Période actuelle</span>
+                <span><i className="previous" />Période précédente</span>
+              </div>
+              <ComparisonRow
+                label="Revenu"
+                current={report.current.revenue_mad}
+                previous={report.previous.revenue_mad}
+                format={(value) => money(value)}
+              />
+              <ComparisonRow
+                label="Commandes"
+                current={report.current.orders}
+                previous={report.previous.orders}
+                format={(value) => value.toLocaleString("fr-MA")}
+              />
+              <ComparisonRow
+                label="Unités vendues"
+                current={report.current.units_sold}
+                previous={report.previous.units_sold}
+                format={(value) => value.toLocaleString("fr-MA")}
+              />
             </section>
-            <section className="panel">
+
+            <section className="panel analytics-status-panel">
               <div className="analytics-section-head">
                 <div>
-                  <p className="kicker">Surveillance</p>
-                  <h3>Alertes</h3>
+                  <p className="kicker">État des commandes</p>
+                  <h3>Répartition des commandes</h3>
                 </div>
               </div>
-              {report.alerts.length ? (
-                <ul className="analytics-list analytics-alerts">
-                  {report.alerts.map((item) => <li key={item}>{item}</li>)}
-                </ul>
-              ) : (
-                <p className="muted">Aucune alerte importante sur cette période.</p>
-              )}
+              <div className="analytics-status-chart">
+                <StatusRow
+                  label="Livrées"
+                  value={report.current.delivered_orders}
+                  total={report.current.orders}
+                  state="success"
+                />
+                <StatusRow
+                  label="En cours"
+                  value={Math.max(
+                    report.current.orders
+                      - report.current.delivered_orders
+                      - report.current.cancelled_orders,
+                    0,
+                  )}
+                  total={report.current.orders}
+                  state="pending"
+                />
+                <StatusRow
+                  label="Annulées"
+                  value={report.current.cancelled_orders}
+                  total={report.current.orders}
+                  state="danger"
+                />
+              </div>
+              <div className="analytics-status-total">
+                <strong>{report.current.orders}</strong>
+                <span>commandes au total</span>
+              </div>
             </section>
           </div>
 
@@ -268,18 +374,19 @@ export function AnalyticsAgentWorkspace() {
                 </div>
               </div>
               {report.top_products.length ? (
-                <div className="analytics-product-list">
+                <div className="analytics-top-products-chart">
                   {report.top_products.map((product, index) => (
                     <Link href={`/products/${product.product_id}`} key={product.product_id}>
-                      <b>{index + 1}</b>
-                      <span>
-                        <strong>{product.name}</strong>
-                        <small>{product.brand || "Sans marque"}</small>
-                      </span>
-                      <span>
-                        <strong>{product.quantity} unité(s)</strong>
-                        <small>{money(product.revenue_mad)}</small>
-                      </span>
+                      <div>
+                        <span><b>{index + 1}</b><strong>{product.name}</strong></span>
+                        <span>{product.quantity} unité(s) · {money(product.revenue_mad)}</span>
+                      </div>
+                      <div className="analytics-track">
+                        <i
+                          className="current"
+                          style={{ width: `${Math.max(5, (product.quantity / maxProductQuantity) * 100)}%` }}
+                        />
+                      </div>
                     </Link>
                   ))}
                 </div>
@@ -313,6 +420,35 @@ export function AnalyticsAgentWorkspace() {
                 </div>
               ) : (
                 <p className="muted">Tous les produits affichés ont enregistré une vente.</p>
+              )}
+            </section>
+          </div>
+
+          <div className="analytics-insight-grid">
+            <section className="panel">
+              <div className="analytics-section-head">
+                <div>
+                  <p className="kicker">Observations</p>
+                  <h3>Points clés</h3>
+                </div>
+              </div>
+              <ul className="analytics-list">
+                {report.insights.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            </section>
+            <section className="panel">
+              <div className="analytics-section-head">
+                <div>
+                  <p className="kicker">Surveillance</p>
+                  <h3>Alertes</h3>
+                </div>
+              </div>
+              {report.alerts.length ? (
+                <ul className="analytics-list analytics-alerts">
+                  {report.alerts.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              ) : (
+                <p className="muted">Aucune alerte importante sur cette période.</p>
               )}
             </section>
           </div>

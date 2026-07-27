@@ -312,4 +312,8 @@ test("admin Analytics Agent exposes read-only sales intelligence in French", asy
   assert.match(analyticsSource, /Produits les plus vendus/);
   assert.match(analyticsSource, /Produits sans vente/);
   assert.match(analyticsSource, /lecture seule/);
+  assert.match(analyticsSource, /Période actuelle \/ précédente/);
+  assert.match(analyticsSource, /Répartition des commandes/);
+  assert.match(analyticsSource, /analytics-top-products-chart/);
+  assert.match(analyticsSource, /Évolution quotidienne/);
 });
