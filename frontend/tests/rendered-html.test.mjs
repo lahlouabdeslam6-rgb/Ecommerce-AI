@@ -286,4 +286,8 @@ test("admin AI Orchestrator exposes routing, safety and persistent history", asy
   assert.match(workspaceSource, /Historique Orchestrator/);
   assert.match(workspaceSource, /Preview \+ Safety/);
   assert.match(workspaceSource, /actor_email/);
+  assert.match(workspaceSource, /Automatique \(recommande\)/);
+  assert.match(workspaceSource, /setTaskType\(example\.taskType\)/);
+  assert.match(workspaceSource, /Product Agent khaso ID produit s7i7/);
+  assert.match(workspaceSource, /Resultat wajed/);
 });

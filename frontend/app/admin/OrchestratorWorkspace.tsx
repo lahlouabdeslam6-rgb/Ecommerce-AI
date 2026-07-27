@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import type {
   OrchestratorHistory,
@@ -10,19 +10,30 @@ import type {
 import { OrchestratorResult } from "../components/OrchestratorResult";
 
 const examples = [
-  "Bghit creatine ta7t 300 MAD w kayna f stock",
-  "Kteb description premium 3la whey protein",
-  "Prepare campagne promotion creatine pour Instagram et email",
+  {
+    message: "Bghit creatine ta7t 300 MAD w kayna f stock",
+    taskType: "",
+  },
+  {
+    message: "Kteb description premium 3la whey protein",
+    taskType: "content",
+  },
+  {
+    message: "Prepare campagne promotion creatine pour Instagram et email",
+    taskType: "marketing",
+  },
 ];
 
 export function OrchestratorWorkspace() {
   const [message, setMessage] = useState("");
   const [taskType, setTaskType] = useState("");
+  const [productId, setProductId] = useState("");
   const [response, setResponse] = useState<OrchestratorResponse | null>(null);
   const [history, setHistory] = useState<OrchestratorHistory | null>(null);
   const [selected, setSelected] = useState<OrchestratorHistoryItem | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const resultRef = useRef<HTMLDivElement>(null);
 
   const loadHistory = async () => {
     try {
@@ -53,6 +64,10 @@ export function OrchestratorWorkspace() {
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!message.trim()) return;
+    if (taskType === "product" && (!productId || Number(productId) < 1)) {
+      setError("Product Agent khaso ID produit s7i7.");
+      return;
+    }
     setLoading(true);
     setError("");
     setResponse(null);
@@ -64,12 +79,21 @@ export function OrchestratorWorkspace() {
           body: JSON.stringify({
             message: message.trim(),
             ...(taskType ? { task_type: taskType } : {}),
+            ...(taskType === "product"
+              ? { context: { product_id: Number(productId) } }
+              : {}),
           }),
         },
         true,
       );
       setResponse(result);
       await loadHistory();
+      window.requestAnimationFrame(() => {
+        resultRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      });
     } catch (requestError) {
       setError((requestError as Error).message);
     } finally {
@@ -104,16 +128,42 @@ export function OrchestratorWorkspace() {
             <label>
               <span>Routing</span>
               <select value={taskType} onChange={(event) => setTaskType(event.target.value)}>
-                <option value="">Automatique</option>
+                <option value="">Automatique (recommande)</option>
                 <option value="product">Product Agent</option>
                 <option value="recommendation">Recommendation Agent</option>
                 <option value="content">Content Agent</option>
                 <option value="marketing">Marketing Agent</option>
               </select>
+              <small>
+                Khalli Automatique bach Orchestrator ykhtar agent li monasib.
+              </small>
             </label>
+            {taskType === "product" && (
+              <label>
+                <span>ID produit</span>
+                <input
+                  type="number"
+                  min="1"
+                  value={productId}
+                  onChange={(event) => setProductId(event.target.value)}
+                  placeholder="Ex: 23445"
+                  required
+                />
+              </label>
+            )}
             <div className="orchestrator-examples">
               {examples.map((example) => (
-                <button type="button" key={example} onClick={() => setMessage(example)}>{example}</button>
+                <button
+                  type="button"
+                  key={example.message}
+                  onClick={() => {
+                    setMessage(example.message);
+                    setTaskType(example.taskType);
+                    setError("");
+                  }}
+                >
+                  {example.message}
+                </button>
               ))}
             </div>
             <button className="button" disabled={loading || !message.trim()}>
@@ -122,9 +172,14 @@ export function OrchestratorWorkspace() {
           </form>
         </div>
 
-        <div className="orchestrator-live">
+        <div className="orchestrator-live" ref={resultRef} aria-live="polite">
           {response ? (
-            <OrchestratorResult response={response} />
+            <>
+              <div className="alert alert-success">
+                Resultat wajed: {response.selected_agents.join(" + ")}
+              </div>
+              <OrchestratorResult response={response} />
+            </>
           ) : (
             <div className="panel ai-empty-state">
               <span>N</span>
