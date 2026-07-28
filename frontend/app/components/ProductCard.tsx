@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import { api, assetUrl, money } from "../lib/api";
 import { addGuestProduct } from "../lib/guest-cart";
 import type { Cart, Product } from "../types";
@@ -9,8 +10,31 @@ import { useAuth } from "./AuthProvider";
 export function ProductCard({ product }: { product: Product }) {
   const { user } = useAuth();
   const image = assetUrl(product.images?.[0]);
+  const video = assetUrl(product.videos?.[0]);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [videoFailed, setVideoFailed] = useState(false);
   const productPath = `/products/${product.product_id}`;
   const detailHref = productPath;
+
+  useEffect(() => {
+    const element = videoRef.current;
+    if (!element || !video || videoFailed) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          void element.play().catch(() => undefined);
+        } else {
+          element.pause();
+        }
+      },
+      { rootMargin: "180px 0px", threshold: 0.05 },
+    );
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      element.pause();
+    };
+  }, [video, videoFailed]);
 
   const addToCart = async () => {
     try {
@@ -40,7 +64,19 @@ export function ProductCard({ product }: { product: Product }) {
   return (
     <article className="product-card">
       <Link href={detailHref} className="product-visual">
-        {image ? (
+        {video && !videoFailed ? (
+          <video
+            ref={videoRef}
+            src={video}
+            poster={image || undefined}
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            aria-label={`Vidéo de ${product.name || "ce produit"}`}
+            onError={() => setVideoFailed(true)}
+          />
+        ) : image ? (
           <img src={image} alt={product.image_alt || product.name || "Produit"} />
         ) : (
           <div className="product-placeholder" aria-hidden="true">

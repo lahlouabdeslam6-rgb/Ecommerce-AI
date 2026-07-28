@@ -120,6 +120,22 @@ test("admin and support can upload multiple product photos and videos", async ()
   assert.match(detailSource, /product-media-thumbnails/);
 });
 
+test("catalogue product videos autoplay only near the viewport", async () => {
+  const cardSource = await readFile(
+    new URL("../app/components/ProductCard.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(cardSource, /product\.videos\?\.\[0\]/);
+  assert.match(cardSource, /IntersectionObserver/);
+  assert.match(cardSource, /rootMargin: "180px 0px"/);
+  assert.match(cardSource, /element\.play\(\)/);
+  assert.match(cardSource, /element\.pause\(\)/);
+  assert.match(cardSource, /muted/);
+  assert.match(cardSource, /loop/);
+  assert.match(cardSource, /playsInline/);
+  assert.match(cardSource, /poster=\{image \|\| undefined\}/);
+});
+
 test("checkout exposes COD and card payment without persisting sensitive fields", async () => {
   const response = await render("/checkout");
   assert.equal(response.status, 200);
