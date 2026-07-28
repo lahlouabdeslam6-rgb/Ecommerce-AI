@@ -173,12 +173,17 @@ class AuthService:
         await self.repository.update_password(user, hash_password(new_password))
 
     async def list_users(
-        self, page: int, page_size: int, role: str | None = None
+        self,
+        page: int,
+        page_size: int,
+        role: str | None = None,
+        search: str | None = None,
     ) -> UserListResponse:
         users, total = await self.repository.list_users(
             page=page,
             page_size=page_size,
             role=role,
+            search=search,
         )
         return UserListResponse(
             items=[UserResponse.model_validate(user) for user in users],

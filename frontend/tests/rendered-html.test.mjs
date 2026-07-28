@@ -461,3 +461,26 @@ test("admin SEO Agent audits and applies controlled product metadata", async () 
   assert.match(detailSource, /product\.image_alt/);
   assert.match(cardSource, /product\.image_alt/);
 });
+
+test("staff Pilotage supports catalogue and user search plus media on creation", async () => {
+  const [adminSource, supportSource] = await Promise.all([
+    readFile(new URL("../app/admin/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/support/page.tsx", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(adminSource, /Rechercher un produit/);
+  assert.match(adminSource, /\/api\/products\/manage\?page_size=100/);
+  assert.match(adminSource, /Rechercher un utilisateur/);
+  assert.match(adminSource, /\/api\/admin\/users\?page_size=100/);
+  assert.match(adminSource, /pendingMedia/);
+  assert.match(
+    adminSource,
+    /Ces fichiers seront ajoutés automatiquement après la création du produit/,
+  );
+  assert.doesNotMatch(
+    adminSource,
+    /\{editingId && <label className="full-field">Ajouter des photos/,
+  );
+  assert.match(supportSource, /Rechercher un produit/);
+  assert.match(supportSource, /\/api\/products\/manage\?page=/);
+});

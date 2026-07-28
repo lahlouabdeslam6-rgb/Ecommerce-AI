@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
@@ -107,10 +107,19 @@ class UserRepository:
         page: int,
         page_size: int,
         role: str | None = None,
+        search: str | None = None,
     ) -> tuple[list[User], int]:
         conditions = [User.is_deleted.is_(False)]
         if role:
             conditions.append(User.role == role)
+        if search and search.strip():
+            pattern = f"%{search.strip()}%"
+            conditions.append(
+                or_(
+                    User.full_name.ilike(pattern),
+                    User.email.ilike(pattern),
+                )
+            )
         total = int(
             (
                 await self.session.execute(

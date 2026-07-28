@@ -37,8 +37,14 @@ async def list_support_users(
     session: Annotated[AsyncSession, Depends(get_sqlite_session)],
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 50,
+    search: Annotated[str | None, Query(min_length=1, max_length=120)] = None,
 ) -> UserListResponse:
-    return await AuthService(session).list_users(page, page_size, role="support")
+    return await AuthService(session).list_users(
+        page,
+        page_size,
+        role="support",
+        search=search,
+    )
 
 
 @router.post(
@@ -133,8 +139,13 @@ async def list_users(
     session: Annotated[AsyncSession, Depends(get_sqlite_session)],
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+    search: Annotated[str | None, Query(min_length=1, max_length=120)] = None,
 ) -> UserListResponse:
-    return await AuthService(session).list_users(page, page_size)
+    return await AuthService(session).list_users(
+        page,
+        page_size,
+        search=search,
+    )
 
 
 @router.patch("/users/{user_id}/role", response_model=UserResponse)

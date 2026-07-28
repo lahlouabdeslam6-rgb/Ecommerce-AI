@@ -132,6 +132,29 @@ async def catalog_filters() -> dict[str, list[str]]:
     return await product_service.catalog_filters()
 
 
+@router.get("/manage", response_model=ProductListResponse)
+async def manage_products(
+    _: Annotated[User, Depends(require_roles("admin", "support"))],
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 50,
+    search: Annotated[str | None, Query(min_length=1, max_length=120)] = None,
+) -> ProductListResponse:
+    return await product_service.list_products(
+        page=page,
+        page_size=page_size,
+        search=search,
+        brand=None,
+        ingredient=None,
+        category=None,
+        flavor=None,
+        min_price=None,
+        max_price=None,
+        in_stock=None,
+        sort_by="newest",
+        active_only=False,
+    )
+
+
 @router.get("/{product_id}", response_model=ProductResponse)
 async def get_product(product_id: int) -> ProductResponse:
     return await product_service.get_product(product_id)

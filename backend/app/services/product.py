@@ -27,6 +27,7 @@ class ProductService:
         max_price: float | None,
         in_stock: bool | None,
         sort_by: str = "newest",
+        active_only: bool = True,
     ) -> ProductListResponse:
         skip = (page - 1) * page_size
         products, total = await self.repository.list_products(
@@ -41,6 +42,7 @@ class ProductService:
             max_price=max_price,
             in_stock=in_stock,
             sort_by=sort_by,
+            active_only=active_only,
         )
         total_pages = (total + page_size - 1) // page_size
         return ProductListResponse(
