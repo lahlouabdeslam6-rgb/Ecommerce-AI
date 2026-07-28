@@ -118,6 +118,22 @@ class ProductService:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Product not found")
         return ProductResponse.model_validate(product)
 
+    async def set_videos(
+        self, product_id: int, videos: list[str]
+    ) -> ProductResponse:
+        current = await self.get_product(product_id)
+        if len(videos) != len(set(videos)):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Duplicate video URL")
+        if not set(videos).issubset(set(current.videos)):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                "Videos must already belong to this product",
+            )
+        product = await self.repository.set_videos(product_id, videos)
+        if product is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Product not found")
+        return ProductResponse.model_validate(product)
+
     async def delete_product(self, product_id: int) -> None:
         if not await self.repository.delete_product(product_id):
             raise HTTPException(

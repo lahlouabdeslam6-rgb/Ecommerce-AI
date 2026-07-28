@@ -10,7 +10,7 @@ Le MVP local et l'infrastructure IA sont fonctionnels :
 - catalogue, recherche, filtres et tri ;
 - panier invite ou connecte, commande sans compte et paiement a la livraison ;
 - espaces client, support et administration ;
-- gestion des produits, du stock et des photos ;
+- gestion des produits, du stock, de plusieurs photos et de videos ;
 - tickets support et notifications ;
 - authentification JWT avec refresh token ;
 - verification email et reinitialisation du mot de passe en mode local ;
@@ -98,6 +98,11 @@ la collection vectorielle et la generation locale.
 Le Product Agent est disponible dans la fiche de modification d'un produit.
 Il ne modifie jamais le catalogue automatiquement : l'admin genere, relit,
 peut corriger puis valide la proposition.
+
+L'admin et le support peuvent ajouter jusqu'a 8 medias par envoi depuis la
+fiche produit. Un produit accepte au maximum 12 photos JPEG/PNG/WebP de 5 MB
+chacune et 4 videos MP4/WebM/MOV/M4V de 50 MB chacune. La fiche publique
+affiche une galerie navigable et les fichiers sont controles avant stockage.
 
 Le Content Agent et le SEO Agent sont regroupes dans `Administration > Contenu
 & SEO`. Les

@@ -197,6 +197,13 @@ class ProductRepository:
     ) -> dict[str, Any] | None:
         return await self.update_product(product_id, {"images": images})
 
+    async def set_videos(
+        self,
+        product_id: int,
+        videos: list[str],
+    ) -> dict[str, Any] | None:
+        return await self.update_product(product_id, {"videos": videos})
+
     async def delete_product(self, product_id: int) -> bool:
         result = await self.collection.delete_one({"product_id": product_id})
         return result.deleted_count == 1

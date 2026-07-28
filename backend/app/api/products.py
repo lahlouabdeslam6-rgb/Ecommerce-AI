@@ -26,6 +26,7 @@ from app.schemas.product import (
     ProductResponse,
     ProductStockUpdate,
     ProductUpdate,
+    ProductVideosOrder,
 )
 from app.services.product import ProductService
 from app.services.product_agent import ProductAgentService
@@ -35,11 +36,44 @@ router = APIRouter(prefix="/products", tags=["Products"])
 product_service = ProductService()
 UPLOAD_DIRECTORY = Path("app/static/uploads/products")
 MAX_IMAGE_SIZE = 5 * 1024 * 1024
+MAX_VIDEO_SIZE = 50 * 1024 * 1024
+MAX_MEDIA_FILES_PER_UPLOAD = 8
+MAX_PRODUCT_IMAGES = 12
+MAX_PRODUCT_VIDEOS = 4
 ALLOWED_IMAGE_TYPES = {
     "image/jpeg": "jpg",
     "image/png": "png",
     "image/webp": "webp",
 }
+ALLOWED_VIDEO_TYPES = {
+    "video/mp4": "mp4",
+    "video/webm": "webm",
+    "video/quicktime": "mov",
+    "video/x-m4v": "m4v",
+}
+
+
+def _valid_media_signature(extension: str, content: bytes) -> bool:
+    checks = {
+        "jpg": content.startswith(b"\xff\xd8\xff"),
+        "png": content.startswith(b"\x89PNG\r\n\x1a\n"),
+        "webp": content.startswith(b"RIFF") and content[8:12] == b"WEBP",
+        "mp4": len(content) >= 12 and content[4:8] == b"ftyp",
+        "mov": len(content) >= 12 and content[4:8] == b"ftyp",
+        "m4v": len(content) >= 12 and content[4:8] == b"ftyp",
+        "webm": content.startswith(b"\x1aE\xdf\xa3"),
+    }
+    return bool(content) and checks.get(extension, False)
+
+
+async def _unlink_local_asset(asset_url: str) -> None:
+    local_prefix = "/static/uploads/products/"
+    if not asset_url.startswith(local_prefix):
+        return
+    target = (UPLOAD_DIRECTORY / Path(asset_url).name).resolve()
+    upload_root = UPLOAD_DIRECTORY.resolve()
+    if target.parent == upload_root and target.exists():
+        await to_thread.run_sync(target.unlink)
 
 
 @router.get("", response_model=ProductListResponse)
@@ -200,19 +234,19 @@ async def upload_product_image(
             detail="Only JPEG, PNG and WebP images are allowed",
         )
 
-    await product_service.get_product(product_id)
+    current = await product_service.get_product(product_id)
+    if len(current.images) >= MAX_PRODUCT_IMAGES:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"A product cannot have more than {MAX_PRODUCT_IMAGES} images",
+        )
     content = await image.read(MAX_IMAGE_SIZE + 1)
     if len(content) > MAX_IMAGE_SIZE:
         raise HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail="Image must not exceed 5 MB",
         )
-    signatures_valid = {
-        "jpg": content.startswith(b"\xff\xd8\xff"),
-        "png": content.startswith(b"\x89PNG\r\n\x1a\n"),
-        "webp": content.startswith(b"RIFF") and content[8:12] == b"WEBP",
-    }
-    if not content or not signatures_valid[extension]:
+    if not _valid_media_signature(extension, content):
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail="Image content does not match its declared type",
@@ -231,6 +265,113 @@ async def upload_product_image(
         entity_type="product",
         entity_id=product_id,
         details={"image_url": image_url},
+    )
+    await session.commit()
+    return product
+
+
+@router.post("/{product_id}/media", response_model=ProductResponse)
+async def upload_product_media(
+    product_id: int,
+    user: Annotated[User, Depends(require_roles("admin", "support"))],
+    session: Annotated[AsyncSession, Depends(get_sqlite_session)],
+    files: Annotated[
+        list[UploadFile],
+        File(
+            description=(
+                "Up to 8 JPEG, PNG, WebP, MP4, WebM, MOV or M4V files. "
+                "Images max 5 MB; videos max 50 MB."
+            )
+        ),
+    ],
+) -> ProductResponse:
+    if not files or len(files) > MAX_MEDIA_FILES_PER_UPLOAD:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Select between 1 and {MAX_MEDIA_FILES_PER_UPLOAD} files",
+        )
+
+    current = await product_service.get_product(product_id)
+    definitions: list[tuple[UploadFile, str, str, int]] = []
+    image_count = 0
+    video_count = 0
+    for media in files:
+        content_type = media.content_type or ""
+        if content_type in ALLOWED_IMAGE_TYPES:
+            definitions.append(
+                (media, "image", ALLOWED_IMAGE_TYPES[content_type], MAX_IMAGE_SIZE)
+            )
+            image_count += 1
+        elif content_type in ALLOWED_VIDEO_TYPES:
+            definitions.append(
+                (media, "video", ALLOWED_VIDEO_TYPES[content_type], MAX_VIDEO_SIZE)
+            )
+            video_count += 1
+        else:
+            raise HTTPException(
+                status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                "Only JPEG, PNG, WebP, MP4, WebM, MOV and M4V files are allowed",
+            )
+
+    if len(current.images) + image_count > MAX_PRODUCT_IMAGES:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"A product cannot have more than {MAX_PRODUCT_IMAGES} images",
+        )
+    if len(current.videos) + video_count > MAX_PRODUCT_VIDEOS:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"A product cannot have more than {MAX_PRODUCT_VIDEOS} videos",
+        )
+
+    UPLOAD_DIRECTORY.mkdir(parents=True, exist_ok=True)
+    created_urls: list[str] = []
+    image_urls: list[str] = []
+    video_urls: list[str] = []
+    try:
+        for media, media_kind, extension, size_limit in definitions:
+            content = await media.read(size_limit + 1)
+            if len(content) > size_limit:
+                label = "Image" if media_kind == "image" else "Video"
+                limit_mb = size_limit // (1024 * 1024)
+                raise HTTPException(
+                    status.HTTP_413_CONTENT_TOO_LARGE,
+                    f"{label} must not exceed {limit_mb} MB",
+                )
+            if not _valid_media_signature(extension, content):
+                raise HTTPException(
+                    status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                    "Media content does not match its declared type",
+                )
+            filename = f"{product_id}-{uuid4().hex}.{extension}"
+            target = UPLOAD_DIRECTORY / filename
+            await to_thread.run_sync(target.write_bytes, content)
+            asset_url = f"/static/uploads/products/{filename}"
+            created_urls.append(asset_url)
+            if media_kind == "image":
+                image_urls.append(asset_url)
+            else:
+                video_urls.append(asset_url)
+
+        product = await product_service.update_product(
+            product_id,
+            ProductUpdate(
+                images=[*current.images, *image_urls],
+                videos=[*current.videos, *video_urls],
+            ),
+        )
+    except Exception:
+        for asset_url in created_urls:
+            await _unlink_local_asset(asset_url)
+        raise
+
+    OperationsRepository(session).add_audit(
+        actor_id=user.id,
+        actor_role=user.role,
+        action="product.media.add",
+        entity_type="product",
+        entity_id=product_id,
+        details={"images": image_urls, "videos": video_urls},
     )
     await session.commit()
     return product
@@ -261,6 +402,31 @@ async def reorder_product_images(
     return product
 
 
+@router.patch("/{product_id}/videos/order", response_model=ProductResponse)
+async def reorder_product_videos(
+    product_id: int,
+    data: ProductVideosOrder,
+    user: Annotated[User, Depends(require_roles("admin", "support"))],
+    session: Annotated[AsyncSession, Depends(get_sqlite_session)],
+) -> ProductResponse:
+    current = await product_service.get_product(product_id)
+    if set(data.videos) != set(current.videos):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "The complete current video list is required",
+        )
+    product = await product_service.set_videos(product_id, data.videos)
+    OperationsRepository(session).add_audit(
+        actor_id=user.id,
+        actor_role=user.role,
+        action="product.videos.reordered",
+        entity_type="product",
+        entity_id=product_id,
+    )
+    await session.commit()
+    return product
+
+
 @router.delete("/{product_id}/images", response_model=ProductResponse)
 async def remove_product_image(
     product_id: int,
@@ -274,13 +440,7 @@ async def remove_product_image(
     product = await product_service.set_images(
         product_id, [item for item in current.images if item != image_url]
     )
-    local_prefix = "/static/uploads/products/"
-    if image_url.startswith(local_prefix):
-        filename = Path(image_url).name
-        target = (UPLOAD_DIRECTORY / filename).resolve()
-        upload_root = UPLOAD_DIRECTORY.resolve()
-        if target.parent == upload_root and target.exists():
-            await to_thread.run_sync(target.unlink)
+    await _unlink_local_asset(image_url)
     OperationsRepository(session).add_audit(
         actor_id=user.id,
         actor_role=user.role,
@@ -288,6 +448,32 @@ async def remove_product_image(
         entity_type="product",
         entity_id=product_id,
         details={"image_url": image_url},
+    )
+    await session.commit()
+    return product
+
+
+@router.delete("/{product_id}/videos", response_model=ProductResponse)
+async def remove_product_video(
+    product_id: int,
+    video_url: Annotated[str, Query(min_length=1, max_length=500)],
+    user: Annotated[User, Depends(require_roles("admin", "support"))],
+    session: Annotated[AsyncSession, Depends(get_sqlite_session)],
+) -> ProductResponse:
+    current = await product_service.get_product(product_id)
+    if video_url not in current.videos:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Video not found")
+    product = await product_service.set_videos(
+        product_id, [item for item in current.videos if item != video_url]
+    )
+    await _unlink_local_asset(video_url)
+    OperationsRepository(session).add_audit(
+        actor_id=user.id,
+        actor_role=user.role,
+        action="product.video.removed",
+        entity_type="product",
+        entity_id=product_id,
+        details={"video_url": video_url},
     )
     await session.commit()
     return product

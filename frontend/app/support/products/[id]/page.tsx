@@ -72,22 +72,24 @@ export default function SupportProductEditorPage() {
     }
   };
 
-  const uploadImage = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const uploadMedia = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
     const data = new FormData();
-    data.append("image", file);
+    files.forEach((file) => data.append("files", file));
     setError("");
     try {
       const updated = await api<Product>(
-        `/api/products/${productId}/images`,
+        `/api/products/${productId}/media`,
         { method: "POST", body: data },
         true,
       );
       setProduct(updated);
-      setMessage("Photo ajoutee.");
+      setMessage(`${files.length} média(s) ajouté(s).`);
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      event.target.value = "";
     }
   };
 
@@ -115,8 +117,8 @@ export default function SupportProductEditorPage() {
               <label>Stock<input type="number" min="0" value={form.stock} onChange={(event) => setForm({ ...form, stock: Number(event.target.value) })} required /></label>
               <label className="check-filter"><input type="checkbox" checked={form.is_active} onChange={(event) => setForm({ ...form, is_active: event.target.checked })} /><span>Produit actif</span></label>
               <label className="full-field">Description<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label>
-              <label className="full-field">Ajouter une photo<input type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadImage} /></label>
-              {product && <div className="full-field"><strong>Photos actuelles</strong><ProductImageManager product={product} onChange={setProduct} onError={setError} /></div>}
+              <label className="full-field">Ajouter des photos ou vidéos<input type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime,video/x-m4v" multiple onChange={uploadMedia} /><small>Jusqu&apos;à 8 fichiers par envoi. Photo: 5 MB. Vidéo: 50 MB.</small></label>
+              {product && <div className="full-field"><strong>Médias actuels</strong><ProductImageManager product={product} onChange={setProduct} onError={setError} /></div>}
             </div>
             <div className="editor-actions">
               <button className="button" disabled={saving}>{saving ? "Enregistrement..." : "Enregistrer"}</button>

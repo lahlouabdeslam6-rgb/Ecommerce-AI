@@ -43,6 +43,7 @@ class ProductCreate(BaseModel):
     stock: int = Field(default=0, ge=0)
     is_active: bool = True
     images: list[str] = Field(default_factory=list, max_length=12)
+    videos: list[str] = Field(default_factory=list, max_length=4)
     serving_size: ServingSizeResponse | None = None
     servings_per_container: float | None = Field(default=None, ge=0)
     ingredients: list[IngredientResponse] = Field(default_factory=list)
@@ -71,6 +72,7 @@ class ProductUpdate(BaseModel):
     stock: int | None = Field(default=None, ge=0)
     is_active: bool | None = None
     images: list[str] | None = Field(default=None, max_length=12)
+    videos: list[str] | None = Field(default=None, max_length=4)
     serving_size: ServingSizeResponse | None = None
     servings_per_container: float | None = Field(default=None, ge=0)
     ingredients: list[IngredientResponse] | None = None
@@ -99,6 +101,10 @@ class ProductImagesOrder(BaseModel):
     images: list[str] = Field(max_length=12)
 
 
+class ProductVideosOrder(BaseModel):
+    videos: list[str] = Field(max_length=4)
+
+
 class ProductResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -114,6 +120,7 @@ class ProductResponse(BaseModel):
     stock: int = 0
     is_active: bool = True
     images: list[str] = Field(default_factory=list)
+    videos: list[str] = Field(default_factory=list)
     serving_size: ServingSizeResponse | None = None
     servings_per_container: float | None = None
     source: ProductSourceResponse | None = None

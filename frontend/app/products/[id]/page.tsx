@@ -13,12 +13,16 @@ export default function ProductDetailPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
   const [product, setProduct] = useState<Product | null>(null);
+  const [selectedMedia, setSelectedMedia] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [error, setError] = useState("");
 
   useEffect(() => {
     api<Product>(`/api/products/${params.id}`)
-      .then(setProduct)
+      .then((item) => {
+        setProduct(item);
+        setSelectedMedia(item.images?.[0] || item.videos?.[0] || "");
+      })
       .catch((requestError: Error) => setError(requestError.message));
   }, [params.id]);
 
@@ -57,19 +61,59 @@ export default function ProductDetailPage() {
     return <div className="page-loading">Chargement du produit...</div>;
   }
 
-  const image = assetUrl(product.images?.[0]);
+  const videos = product.videos || [];
+  const media = [
+    ...product.images.map((url) => ({ type: "image" as const, url })),
+    ...videos.map((url) => ({ type: "video" as const, url })),
+  ];
+  const activeMedia = selectedMedia || media[0]?.url || "";
+  const activeIsVideo = videos.includes(activeMedia);
+  const activeUrl = assetUrl(activeMedia);
   const isStaff = user?.role === "admin" || user?.role === "support";
 
   return (
     <>
       <section className="shell page-section product-detail">
-        <div className="detail-visual">
-          {image ? (
-            <img src={image} alt={product.image_alt || product.name || "Produit"} />
-          ) : (
-            <div className="detail-placeholder">
-              <span>{(product.category || "S")[0].toUpperCase()}</span>
-              <small>Photo a venir</small>
+        <div className="product-media-column">
+          <div className="detail-visual">
+            {activeUrl && activeIsVideo ? (
+              <video src={activeUrl} controls playsInline preload="metadata" />
+            ) : activeUrl ? (
+              <img src={activeUrl} alt={product.image_alt || product.name || "Produit"} />
+            ) : (
+              <div className="detail-placeholder">
+                <span>{(product.category || "S")[0].toUpperCase()}</span>
+                <small>Média à venir</small>
+              </div>
+            )}
+          </div>
+          {media.length > 1 && (
+            <div className="product-media-thumbnails" aria-label="Médias du produit">
+              {media.map((item, index) => (
+                <button
+                  type="button"
+                  key={item.url}
+                  className={activeMedia === item.url ? "active" : ""}
+                  onClick={() => setSelectedMedia(item.url)}
+                  aria-label={
+                    item.type === "video"
+                      ? `Voir la vidéo ${index + 1}`
+                      : `Voir la photo ${index + 1}`
+                  }
+                >
+                  {item.type === "video" ? (
+                    <>
+                      <video src={assetUrl(item.url)} muted preload="metadata" />
+                      <span>Vidéo</span>
+                    </>
+                  ) : (
+                    <img
+                      src={assetUrl(item.url)}
+                      alt={`${product.name || "Produit"} ${index + 1}`}
+                    />
+                  )}
+                </button>
+              ))}
             </div>
           )}
         </div>

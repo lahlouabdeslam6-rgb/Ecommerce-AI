@@ -26,6 +26,7 @@ export type Product = {
   stock: number;
   is_active: boolean;
   images: string[];
+  videos: string[];
   form_type: string | null;
   ingredients: Ingredient[];
   serving_size?: { count?: number; unit?: string };

@@ -94,6 +94,32 @@ test("support can edit products without cart controls", async () => {
   assert.match(supportWorkspace, /\/support\/products\/\$\{product\.product_id\}/);
 });
 
+test("admin and support can upload multiple product photos and videos", async () => {
+  const [adminSource, supportEditor, managerSource, detailSource] =
+    await Promise.all([
+      readFile(new URL("../app/admin/page.tsx", import.meta.url), "utf8"),
+      readFile(
+        new URL("../app/support/products/[id]/page.tsx", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../app/components/ProductImageManager.tsx", import.meta.url),
+        "utf8",
+      ),
+      readFile(new URL("../app/products/[id]/page.tsx", import.meta.url), "utf8"),
+    ]);
+  for (const source of [adminSource, supportEditor]) {
+    assert.match(source, /Ajouter des photos ou vidéos/);
+    assert.match(source, /multiple/);
+    assert.match(source, /\/api\/products\/\$\{[^}]+\}\/media/);
+    assert.match(source, /video\/mp4/);
+  }
+  assert.match(managerSource, /\/videos\?video_url=/);
+  assert.match(managerSource, /Vidéo principale/);
+  assert.match(detailSource, /controls playsInline/);
+  assert.match(detailSource, /product-media-thumbnails/);
+});
+
 test("checkout exposes COD and card payment without persisting sensitive fields", async () => {
   const response = await render("/checkout");
   assert.equal(response.status, 200);
