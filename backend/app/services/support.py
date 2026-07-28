@@ -157,8 +157,8 @@ class SupportService:
     @staticmethod
     def _staff_ticket_link(role: str, ticket_id: int) -> str:
         if role == "admin":
-            return f"/admin?tab=messages&ticket={ticket_id}"
-        return f"/support?ticket={ticket_id}"
+            return f"/admin?tab=support-delivery&ticket={ticket_id}"
+        return f"/support?tab=operations&ticket={ticket_id}"
 
     async def set_status(
         self, ticket_id: int, value: str, actor: User | None = None

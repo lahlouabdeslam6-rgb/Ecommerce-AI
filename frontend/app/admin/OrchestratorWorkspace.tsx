@@ -158,6 +158,7 @@ export function OrchestratorWorkspace() {
                 <option value="stock_forecast">Stock Forecast Agent</option>
                 <option value="delivery">Delivery Agent</option>
                 <option value="seo">SEO Agent</option>
+                <option value="order_verification">Order Verification Agent</option>
               </select>
               <small>
                 Laissez le mode automatique pour que l&apos;Orchestrator sélectionne l&apos;agent adapté.

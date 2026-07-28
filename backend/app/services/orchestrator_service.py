@@ -27,6 +27,7 @@ from app.services.analytics_agent import AnalyticsAgentService
 from app.services.stock_forecast_agent import StockForecastAgentService
 from app.services.delivery_agent import DeliveryAgentService
 from app.services.seo_agent import SEOAgentService
+from app.services.order_verification_agent import OrderVerificationAgentService
 from app.services.support_agent import SupportAgentService
 from app.schemas.content import ContentGenerateRequest
 from app.schemas.marketing import MarketingGenerateRequest
@@ -105,6 +106,10 @@ _INTENT_KEYWORDS: dict[str, set[str]] = {
     "seo": {
         "seo", "referencement", "meta", "slug", "keywords",
         "mots-cles", "google",
+    },
+    "order_verification": {
+        "verification", "verifier", "confirmer", "confirmation",
+        "doublon", "fraude", "prioritaire",
     },
 }
 
@@ -185,6 +190,13 @@ class OrchestratorService:
                     "Les agents Content, Marketing, Analytics, Stock Forecast, "
                     "Delivery et SEO sont réservés aux administrateurs.",
                 )
+        if intent == "order_verification" and (
+            self.user is None or self.user.role not in {"admin", "support"}
+        ):
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "La vérification des commandes est réservée à l'équipe.",
+            )
 
         proposed_action = (
             self._describe_mutation(request.message)
@@ -239,6 +251,8 @@ class OrchestratorService:
             results, agents = await self._handle_delivery()
         elif intent == "seo":
             results, agents = await self._handle_seo(ctx)
+        elif intent == "order_verification":
+            results, agents = await self._handle_order_verification()
         else:
             # Compound: product + recommendation
             results, agents = await self._handle_compound(
@@ -254,6 +268,7 @@ class OrchestratorService:
                 "stock_forecast",
                 "delivery",
                 "seo",
+                "order_verification",
             }
             else await self._run_safety(request.message, results)
         )
@@ -294,6 +309,11 @@ class OrchestratorService:
         seo_hits = tokens & _INTENT_KEYWORDS["seo"]
         if seo_hits:
             return "seo"
+
+        verification_hits = tokens & _INTENT_KEYWORDS["order_verification"]
+        order_hits = tokens & {"commande", "commandes", "order", "orders", "cod"}
+        if verification_hits and order_hits:
+            return "order_verification"
 
         delivery_hits = tokens & _INTENT_KEYWORDS["delivery"]
         delivery_analysis = tokens & {
@@ -483,6 +503,36 @@ class OrchestratorService:
                     data={"error": str(exc)},
                 )
             ], ["delivery"]
+
+    async def _handle_order_verification(
+        self,
+    ) -> tuple[list[AgentResult], list[str]]:
+        if self.session is None:
+            return [
+                AgentResult(
+                    agent="order_verification",
+                    status="error",
+                    data={"error": "Une session est requise."},
+                )
+            ], ["order_verification"]
+        try:
+            report = await OrderVerificationAgentService(self.session).report()
+            return [
+                AgentResult(
+                    agent="order_verification",
+                    status="success",
+                    data=report.model_dump(mode="json"),
+                )
+            ], ["order_verification"]
+        except Exception as exc:
+            logger.warning("OrderVerificationAgent report error: %s", exc)
+            return [
+                AgentResult(
+                    agent="order_verification",
+                    status="error",
+                    data={"error": str(exc)},
+                )
+            ], ["order_verification"]
 
     async def _handle_seo(
         self,

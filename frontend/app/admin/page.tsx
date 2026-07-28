@@ -15,6 +15,7 @@ import { OrchestratorWorkspace } from "./OrchestratorWorkspace";
 import { SafetyAgentWorkspace } from "./SafetyAgentWorkspace";
 import { SEOAgentWorkspace } from "./SEOAgentWorkspace";
 import { StockForecastWorkspace } from "./StockForecastWorkspace";
+import { OrderVerificationWorkspace } from "../components/OrderVerificationWorkspace";
 import { api, money } from "../lib/api";
 import type { PaginatedOrders, Product, ProductList, User } from "../types";
 
@@ -75,7 +76,15 @@ export default function AdminPage() {
   useEffect(() => { void load(); }, [user]);
 
   useEffect(() => {
-    if (requestedTab === "messages" || requestedTab === "orders") setTab(requestedTab);
+    if (requestedTab === "messages" || requestedTab === "delivery") {
+      setTab("support-delivery");
+    } else if (requestedTab === "analytics" || requestedTab === "stock-forecast") {
+      setTab("business-intelligence");
+    } else if (requestedTab === "content" || requestedTab === "seo") {
+      setTab("content-seo");
+    } else if (requestedTab === "orders") {
+      setTab("orders");
+    }
   }, [requestedTab]);
 
   useEffect(() => {
@@ -229,7 +238,7 @@ export default function AdminPage() {
     }
   };
 
-  return <Protected admin><section className="admin-shell"><aside className="admin-sidebar"><p className="kicker">Administration</p><h1>Pilotage</h1>{[["dashboard", "Vue d'ensemble"], ["products", "Produits"], ["orchestrator", "AI Orchestrator"], ["analytics", "Analytics AI"], ["stock-forecast", "Stock intelligent"], ["delivery", "Livraisons AI"], ["seo", "SEO AI"], ["content", "Contenu AI"], ["marketing", "Marketing AI"], ["safety", "Safety AI"], ["orders", "Commandes"], ["messages", "Messages clients"], ["support-users", "Equipe support"], ["users", "Utilisateurs"], ["audit", "Historique"]].map(([value, label]) => <button key={value} className={tab === value || (value === "support-users" && tab === "support-editor") ? "active" : ""} onClick={() => setTab(value)}>{label}</button>)}</aside><div className="admin-content">{message && <div className="alert alert-success">{message}</div>}{error && <div className="alert alert-error">{error}</div>}
+  return <Protected admin><section className="admin-shell"><aside className="admin-sidebar"><p className="kicker">Administration</p><h1>Pilotage</h1>{[["dashboard", "Vue d'ensemble"], ["products", "Produits"], ["orchestrator", "AI Orchestrator"], ["content-seo", "Contenu & SEO"], ["business-intelligence", "Business Intelligence"], ["support-delivery", "Support & livraison"], ["marketing", "Marketing AI"], ["safety", "Safety AI"], ["orders", "Commandes"], ["support-users", "Equipe support"], ["users", "Utilisateurs"], ["audit", "Historique"]].map(([value, label]) => <button key={value} className={tab === value || (value === "support-users" && tab === "support-editor") ? "active" : ""} onClick={() => setTab(value)}>{label}</button>)}</aside><div className="admin-content">{message && <div className="alert alert-success">{message}</div>}{error && <div className="alert alert-error">{error}</div>}
 
     {tab === "dashboard" && <><Title kicker="Aujourd'hui" title="Vue d'ensemble" />{dashboard ? <div className="stats-grid"><Stat label="Produits" value={dashboard.products} /><Stat label="Produits actifs" value={dashboard.active_products} /><Stat label="Stock faible" value={dashboard.low_stock_products} accent /><Stat label="Utilisateurs" value={dashboard.users} /><Stat label="Equipe support" value={supportUsers?.total || 0} /><Stat label="Commandes" value={dashboard.orders} /><Stat label="En attente" value={dashboard.pending_orders} accent /><Stat label="Revenu COD" value={money(dashboard.revenue_mad)} /></div> : <div className="page-loading">Chargement...</div>}</>}
 
@@ -237,25 +246,19 @@ export default function AdminPage() {
 
     {tab === "product-editor" && <><Title kicker="Catalogue" title={editingId ? `Modifier #${editingId}` : "Nouveau produit"} action={<button className="text-link" onClick={() => setTab("products")}>Retour</button>} /><form className="panel product-editor" onSubmit={saveProduct}><div className="form-grid"><label>Nom<input value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} required /></label><label>Marque<input value={productForm.brand} onChange={(e) => setProductForm({ ...productForm, brand: e.target.value })} required /></label><label>Categorie<input value={productForm.category} onChange={(e) => setProductForm({ ...productForm, category: e.target.value })} /></label><label>Prix MAD<input type="number" step="0.01" min="0" value={productForm.price} onChange={(e) => setProductForm({ ...productForm, price: Number(e.target.value) })} required /></label><label>Stock<input type="number" min="0" value={productForm.stock} onChange={(e) => setProductForm({ ...productForm, stock: Number(e.target.value) })} required /></label><label className="check-filter"><input type="checkbox" checked={productForm.is_active} onChange={(e) => setProductForm({ ...productForm, is_active: e.target.checked })} /><span>Produit actif</span></label><label className="full-field">Description<textarea value={productForm.description} onChange={(e) => setProductForm({ ...productForm, description: e.target.value })} /></label>{editingId && <div className="full-field ai-product-actions"><button type="button" className="button button-ai" onClick={generateProductSuggestion} disabled={generatingAI || applyingAI}>{generatingAI ? "Product Agent travaille..." : "Optimiser avec Product Agent"}</button><small>L'AI prepare une proposition. Aucune information ne change sans ta validation.</small></div>}{aiSuggestion && <section className="full-field ai-product-panel"><div className="ai-product-heading"><div><span>PRODUCT AGENT</span><strong>Proposition a valider</strong></div><small>{aiSuggestion.model}{aiSuggestion.cached ? " · cache" : ""}</small></div><div className="form-grid"><label>Categorie proposee<input value={aiSuggestion.category} onChange={(e) => setAiSuggestion((current) => current ? { ...current, category: e.target.value } : current)} /></label><label>Titre SEO<input value={aiSuggestion.seo_title} maxLength={70} onChange={(e) => setAiSuggestion((current) => current ? { ...current, seo_title: e.target.value } : current)} /></label><label className="full-field">Description produit<textarea value={aiSuggestion.description} maxLength={1500} onChange={(e) => setAiSuggestion((current) => current ? { ...current, description: e.target.value } : current)} /></label><label className="full-field">Description SEO<textarea value={aiSuggestion.seo_description} maxLength={180} onChange={(e) => setAiSuggestion((current) => current ? { ...current, seo_description: e.target.value } : current)} /></label><label>Mots-cles SEO<input value={aiSuggestion.seo_keywords.join(", ")} onChange={(e) => setAiSuggestion((current) => current ? { ...current, seo_keywords: splitTerms(e.target.value) } : current)} /></label><label>Tags<input value={aiSuggestion.tags.join(", ")} onChange={(e) => setAiSuggestion((current) => current ? { ...current, tags: splitTerms(e.target.value) } : current)} /></label></div><div className="ai-review-actions"><button type="button" className="button" onClick={applyProductSuggestion} disabled={applyingAI}>{applyingAI ? "Application..." : "Valider et appliquer"}</button><button type="button" className="text-link" onClick={() => setAiSuggestion(null)} disabled={applyingAI}>Ignorer</button></div></section>}{editingId && <label className="full-field">Ajouter une photo<input type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadImage} /></label>}{editingProduct && editingId && <div className="full-field"><strong>Photos actuelles</strong><ProductImageManager product={editingProduct} onChange={setEditingProduct} onError={setError} /></div>}</div><div className="editor-actions"><button className="button">Enregistrer</button>{editingId && <button type="button" className="button button-danger" onClick={deleteProduct}>Supprimer</button>}</div></form></>}
 
-    {tab === "content" && <ContentAgentWorkspace />}
+    {tab === "content-seo" && <><ContentAgentWorkspace /><SEOAgentWorkspace /></>}
 
     {tab === "orchestrator" && <OrchestratorWorkspace />}
 
-    {tab === "analytics" && <AnalyticsAgentWorkspace />}
+    {tab === "business-intelligence" && <><AnalyticsAgentWorkspace /><StockForecastWorkspace /></>}
 
-    {tab === "stock-forecast" && <StockForecastWorkspace />}
-
-    {tab === "delivery" && <DeliveryAgentWorkspace />}
-
-    {tab === "seo" && <SEOAgentWorkspace />}
+    {tab === "support-delivery" && <><OrderVerificationWorkspace /><DeliveryAgentWorkspace /><AdminTicketWorkspace initialTicketId={Number.isInteger(requestedTicketId) && requestedTicketId > 0 ? requestedTicketId : null} /></>}
 
     {tab === "marketing" && <MarketingAgentWorkspace />}
 
     {tab === "safety" && <SafetyAgentWorkspace />}
 
     {tab === "orders" && <><Title kicker="Operations" title="Commandes" />{!orders?.items.length ? <div className="empty-state"><h3>Aucune commande</h3></div> : <div className="data-table orders-table"><div className="table-row table-head"><span>No</span><span>Client</span><span>Total</span><span>Paiement</span><span>Statut</span></div>{orders.items.map((order) => <div className="table-row" key={order.id}><span>#{order.id}</span><span><strong>{order.full_name}</strong><small>{order.city} - {order.phone}</small></span><span>{money(order.total)}</span><span>{order.payment_status}</span><span><select value={order.order_status} onChange={(e) => updateOrder(order.id, e.target.value)}>{orderStatuses.map((status) => <option key={status}>{status}</option>)}</select></span></div>)}</div>}</>}
-
-    {tab === "messages" && <AdminTicketWorkspace initialTicketId={Number.isInteger(requestedTicketId) && requestedTicketId > 0 ? requestedTicketId : null} />}
 
     {tab === "support-users" && <><Title kicker="Acces support" title="Equipe support" action={<button className="button button-small" onClick={newSupport}>Ajouter un support</button>} />{!supportUsers?.items.length ? <div className="empty-state"><h3>Aucun compte support</h3><button className="button" onClick={newSupport}>Creer le premier compte</button></div> : <div className="support-account-grid">{supportUsers.items.map((item) => <article className="support-account-card" key={item.id}><div className="support-avatar">{(item.full_name || item.email).slice(0, 2).toUpperCase()}</div><div><strong>{item.full_name || "Support"}</strong><small>{item.email}</small><span className={`account-state ${item.is_active ? "active" : ""}`}>{item.is_active ? "Actif" : "Desactive"}</span></div><div className="support-account-actions"><button className="text-link" onClick={() => editSupport(item)}>Modifier</button><button className={`status-toggle ${item.is_active ? "on" : ""}`} onClick={() => updateStatus(item.id, !item.is_active)}>{item.is_active ? "Desactiver" : "Activer"}</button></div></article>)}</div>}</>}
 

@@ -40,7 +40,11 @@ const riskLabels: Record<DeliveryRisk, string> = {
   failed: "Échec de livraison",
 };
 
-export function DeliveryAgentWorkspace() {
+export function DeliveryAgentWorkspace({
+  allowNotifications = true,
+}: {
+  allowNotifications?: boolean;
+}) {
   const [report, setReport] = useState<DeliveryReport | null>(null);
   const [risk, setRisk] = useState<DeliveryRisk | "">("");
   const [loading, setLoading] = useState(true);
@@ -114,14 +118,16 @@ export function DeliveryAgentWorkspace() {
           >
             {loading ? "Actualisation..." : "Actualiser"}
           </button>
-          <button
-            type="button"
-            className="button button-ai button-small"
-            onClick={() => load(true)}
-            disabled={loading || notifying}
-          >
-            {notifying ? "Analyse en cours..." : "Analyser et notifier"}
-          </button>
+          {allowNotifications && (
+            <button
+              type="button"
+              className="button button-ai button-small"
+              onClick={() => load(true)}
+              disabled={loading || notifying}
+            >
+              {notifying ? "Analyse en cours..." : "Analyser et notifier"}
+            </button>
+          )}
         </div>
       </div>
       <p className="section-intro">

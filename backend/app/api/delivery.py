@@ -15,7 +15,7 @@ router = APIRouter(prefix="/admin/ai/delivery", tags=["AI Delivery"])
 
 @router.get("/report", response_model=DeliveryReport)
 async def delivery_report(
-    _: Annotated[User, Depends(require_roles("admin"))],
+    _: Annotated[User, Depends(require_roles("admin", "support"))],
     session: Annotated[AsyncSession, Depends(get_sqlite_session)],
 ) -> DeliveryReport:
     return await DeliveryAgentService(session).report(notify=False)
@@ -30,4 +30,3 @@ async def delivery_scan(
         notify=True,
         actor=user,
     )
-

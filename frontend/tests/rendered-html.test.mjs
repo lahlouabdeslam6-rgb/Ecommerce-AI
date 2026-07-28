@@ -151,7 +151,7 @@ test("admin Content Agent uses draft review and controlled publishing", async ()
     readFile(new URL("../app/admin/ContentAgentWorkspace.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
   ]);
-  assert.match(adminSource, /\["content", "Contenu AI"\]/);
+  assert.match(adminSource, /\["content-seo", "Contenu & SEO"\]/);
   assert.match(contentSource, /Validation admin \+ Safety AI/);
   assert.match(contentSource, /Generer le brouillon/);
   assert.match(contentSource, /Enregistrer brouillon/);
@@ -186,12 +186,12 @@ test("admin has a client message inbox and role-aware notification links", async
       "utf8",
     ),
   ]);
-  assert.match(adminSource, /\["messages", "Messages clients"\]/);
+  assert.match(adminSource, /\["support-delivery", "Support & livraison"\]/);
   assert.match(adminSource, /AdminTicketWorkspace/);
   assert.match(inboxSource, /\/api\/support\/tickets\?page_size=100/);
   assert.match(inboxSource, /Reponse admin envoyee au client/);
   assert.match(inboxSource, /\/messages/);
-  assert.match(bellSource, /\/admin\?tab=messages&ticket=/);
+  assert.match(bellSource, /\/admin\?tab=support-delivery&ticket=/);
 });
 
 test("admin Marketing Agent keeps campaigns in a controlled approval flow", async () => {
@@ -321,7 +321,7 @@ test("admin Analytics Agent exposes read-only sales intelligence in French", asy
       "utf8",
     ),
   ]);
-  assert.match(adminSource, /\["analytics", "Analytics AI"\]/);
+  assert.match(adminSource, /\["business-intelligence", "Business Intelligence"\]/);
   assert.match(adminSource, /AnalyticsAgentWorkspace/);
   assert.match(analyticsSource, /\/api\/admin\/ai\/analytics\/report/);
   assert.match(analyticsSource, /Générer le résumé IA/);
@@ -347,7 +347,7 @@ test("admin Stock Forecast Agent explains stock risks with simple graphs", async
       "utf8",
     ),
   ]);
-  assert.match(adminSource, /\["stock-forecast", "Stock intelligent"\]/);
+  assert.match(adminSource, /\["business-intelligence", "Business Intelligence"\]/);
   assert.match(adminSource, /StockForecastWorkspace/);
   assert.match(stockSource, /\/api\/admin\/ai\/stock-forecast\/report/);
   assert.match(stockSource, /Répartition du risque/);
@@ -365,13 +365,42 @@ test("admin Delivery Agent monitors delays and controls notifications", async ()
     readFile(new URL("../app/admin/DeliveryAgentWorkspace.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/admin/OrchestratorWorkspace.tsx", import.meta.url), "utf8"),
   ]);
-  assert.match(adminSource, /\["delivery", "Livraisons AI"\]/);
+  assert.match(adminSource, /\["support-delivery", "Support & livraison"\]/);
   assert.match(adminSource, /DeliveryAgentWorkspace/);
   assert.match(deliverySource, /\/api\/admin\/ai\/delivery\/report/);
   assert.match(deliverySource, /\/api\/admin\/ai\/delivery\/scan/);
   assert.match(deliverySource, /Analyser et notifier/);
   assert.match(deliverySource, /ne sont pas répétées pendant 24 heures/);
   assert.match(orchestratorSource, /Delivery Agent/);
+});
+
+test("staff uses merged AI workspaces and human-controlled order verification", async () => {
+  const [adminSource, supportSource, verificationSource, orchestratorSource] =
+    await Promise.all([
+      readFile(new URL("../app/admin/page.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/support/page.tsx", import.meta.url), "utf8"),
+      readFile(
+        new URL(
+          "../app/components/OrderVerificationWorkspace.tsx",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+      readFile(
+        new URL("../app/admin/OrchestratorWorkspace.tsx", import.meta.url),
+        "utf8",
+      ),
+    ]);
+  assert.match(adminSource, /\["content-seo", "Contenu & SEO"\]/);
+  assert.match(adminSource, /\["business-intelligence", "Business Intelligence"\]/);
+  assert.match(adminSource, /\["support-delivery", "Support & livraison"\]/);
+  assert.match(supportSource, /Support &amp; livraison/);
+  assert.match(supportSource, /OrderVerificationWorkspace/);
+  assert.match(verificationSource, /\/api\/ai\/order-verification\/report/);
+  assert.match(verificationSource, /ne refuse et n&apos;annule jamais/);
+  assert.match(verificationSource, /Vérification prioritaire/);
+  assert.match(verificationSource, /Doublon possible/);
+  assert.match(orchestratorSource, /Order Verification Agent/);
 });
 
 test("admin SEO Agent audits and applies controlled product metadata", async () => {
@@ -381,7 +410,7 @@ test("admin SEO Agent audits and applies controlled product metadata", async () 
     readFile(new URL("../app/products/[id]/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/components/ProductCard.tsx", import.meta.url), "utf8"),
   ]);
-  assert.match(adminSource, /\["seo", "SEO AI"\]/);
+  assert.match(adminSource, /\["content-seo", "Contenu & SEO"\]/);
   assert.match(adminSource, /SEOAgentWorkspace/);
   assert.match(seoSource, /\/api\/admin\/ai\/seo\/audit/);
   assert.match(seoSource, /Valider et appliquer/);

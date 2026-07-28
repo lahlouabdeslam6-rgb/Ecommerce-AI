@@ -95,8 +95,8 @@ def test_content_agent_strips_markup_and_uses_catalogue_cta() -> None:
 
 def test_staff_ticket_notifications_use_role_workspace() -> None:
     assert SupportService._staff_ticket_link("admin", 42) == (
-        "/admin?tab=messages&ticket=42"
+        "/admin?tab=support-delivery&ticket=42"
     )
     assert SupportService._staff_ticket_link("support", 42) == (
-        "/support?ticket=42"
+        "/support?tab=operations&ticket=42"
     )

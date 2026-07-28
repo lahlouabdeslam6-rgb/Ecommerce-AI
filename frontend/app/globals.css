@@ -698,3 +698,24 @@ input:disabled { color:#817c75; background:#1b1a1d; }
   .ai-generated-result { grid-template-columns:1fr; }
   .orchestrator-route { align-items:flex-start; flex-direction:column; }
 }
+.order-verification-workspace,
+.delivery-agent-workspace + .admin-ticket-workspace,
+.order-verification-workspace + .delivery-agent-workspace {
+  margin-top: 2rem;
+}
+
+.verification-to_confirm {
+  border-color: rgba(212, 175, 55, 0.45) !important;
+}
+
+.verification-priority_review {
+  border-color: rgba(235, 132, 52, 0.65) !important;
+}
+
+.verification-possible_duplicate {
+  border-color: rgba(220, 74, 74, 0.7) !important;
+}
+
+.verification-ready_to_prepare {
+  border-color: rgba(74, 180, 115, 0.55) !important;
+}

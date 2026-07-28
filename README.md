@@ -40,6 +40,9 @@ Le MVP local et l'infrastructure IA sont fonctionnels :
 - Delivery Agent avec surveillance des commandes actives, estimation interne
   de livraison, detection des retards, alertes client/support/admin et
   protection contre les notifications en double.
+- Order Verification Agent avec priorisation des appels COD, detection des
+  doublons possibles, coordonnees incompletes et historique d'echecs. Il reste
+  en lecture seule et ne confirme, ne refuse ou n'annule aucune commande.
 - SEO Agent avec audit du catalogue, score par produit, proposition de titre,
   meta description, mots-cles, slug, texte alternatif et FAQ. L'application
   d'une proposition reste une action admin controlee par Safety.
@@ -48,8 +51,8 @@ Le MVP local et l'infrastructure IA sont fonctionnels :
   sensibles sont bloquees et les cas non resolus passent au support humain.
 - AI Orchestrator avec detection d'intention en francais, anglais et darija
   latine, coordination Product, Recommendation, Content, Marketing, Analytics
-  Stock Forecast, Delivery, SEO, Support et Safety, assistant client et espace
-  de supervision admin avec historique.
+  Stock Forecast, Delivery, SEO, Support, Order Verification et Safety,
+  assistant client et espace de supervision admin avec historique.
 - n8n avec workflows de surveillance des livraisons, relance des paniers
   abandonnes et outbox email/WhatsApp. Les messages externes restent en attente
   tant que les credentials SMTP et WhatsApp ne sont pas configures.
@@ -96,7 +99,8 @@ Le Product Agent est disponible dans la fiche de modification d'un produit.
 Il ne modifie jamais le catalogue automatiquement : l'admin genere, relit,
 peut corriger puis valide la proposition.
 
-Le Content Agent est disponible dans `Administration > Contenu AI`. Les
+Le Content Agent et le SEO Agent sont regroupes dans `Administration > Contenu
+& SEO`. Les
 contenus restent en brouillon jusqu'a leur publication manuelle. Les types
 `homepage_hero` et `promotion` publies peuvent alimenter la page d'accueil.
 
@@ -113,22 +117,28 @@ Le Recommendation Agent apparait sous les fiches produits et dans le panier.
 Il classe les produits disponibles avec Qdrant et les donnees du catalogue. Le
 client connecte peut aussi choisir un objectif et un budget maximum par produit.
 
-L'Analytics Agent est disponible dans `Administration > Analytics AI`. La
+L'Analytics Agent et le Stock Forecast Agent sont regroupes dans
+`Administration > Business Intelligence`. La
 route admin `GET /api/admin/ai/analytics/report` calcule les ventes et tendances
 sur 7, 30 ou 90 jours. Le bouton de resume IA utilise Ollama et conserve un
 resume local de secours si le modele est indisponible. Cette analyse est
 strictement en lecture seule.
 
-Le Stock Forecast Agent est disponible dans `Administration > Stock
-intelligent`. La route admin `GET /api/admin/ai/stock-forecast/report` calcule
+La route admin `GET /api/admin/ai/stock-forecast/report` calcule
 les risques de rupture a partir du stock MongoDB et des ventes SQLite. Ollama
 peut rediger une analyse, mais aucune quantite n'est appliquee automatiquement.
 
-Le Delivery Agent est disponible dans `Administration > Livraisons AI`.
+Le Support Agent, le Delivery Agent et le Order Verification Agent sont
+regroupes dans `Administration > Support & livraison`.
 `GET /api/admin/ai/delivery/report` produit un rapport en lecture seule.
 `POST /api/admin/ai/delivery/scan` cree les alertes utiles et alimente l'outbox
 email/WhatsApp. Une meme commande n'est pas notifiee deux fois dans les
 24 heures.
+
+`GET /api/ai/order-verification/report` est accessible aux roles admin et
+support. Il classe les commandes en attente entre confirmation normale,
+verification prioritaire, doublon possible et commande prete a preparer. La
+decision finale reste toujours humaine.
 
 Le compte client est facultatif pour commander. Un visiteur conserve son panier
 dans son navigateur, renseigne son email, son telephone et son adresse, puis
@@ -137,7 +147,7 @@ les espaces admin et support avec les coordonnees necessaires a la confirmation
 telephonique. Delivery Agent utilise ensuite ces memes donnees pour le suivi,
 sans transmettre d'informations inutiles a un modele generatif.
 
-Le SEO Agent est disponible dans `Administration > SEO AI`. Il audite tout le
+Le SEO Agent, dans l'espace `Contenu & SEO`, audite tout le
 catalogue, genere une proposition editable et ne l'applique qu'apres validation
 explicite de l'admin et controle Safety.
 

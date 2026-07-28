@@ -20,6 +20,7 @@ class OrchestratorTaskType(str, Enum):
     stock_forecast = "stock_forecast"
     delivery = "delivery"
     seo = "seo"
+    order_verification = "order_verification"
 
 
 ALLOWED_CONTEXT_KEYS = {

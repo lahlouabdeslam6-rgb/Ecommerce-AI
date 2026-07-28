@@ -50,9 +50,11 @@ export function NotificationBell() {
   const notificationLink = (item: Notification) => {
     if (
       user?.role === "admin" &&
-      item.link?.startsWith("/support?ticket=")
+      item.link?.includes("ticket=") &&
+      item.link.startsWith("/support")
     ) {
-      return item.link.replace("/support?ticket=", "/admin?tab=messages&ticket=");
+      const ticketId = new URLSearchParams(item.link.split("?")[1]).get("ticket");
+      return `/admin?tab=support-delivery&ticket=${ticketId}`;
     }
     return item.link;
   };
