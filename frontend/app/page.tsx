@@ -20,6 +20,22 @@ type PublishedContent = {
   content_type: string;
 };
 
+type ActiveMarketingPromotion = {
+  id: number;
+  promotion_kind: "single_product" | "pack";
+  title: string;
+  headline: string;
+  message: string;
+  cta_label: string;
+  products: Product[];
+  regular_total: number;
+  discount_percentage: number;
+  promotional_total: number;
+  currency: string;
+  starts_at: string | null;
+  ends_at: string | null;
+};
+
 const PROMOTION_SEARCH_TERMS = [
   "creatine",
   "whey",
@@ -100,6 +116,8 @@ export default function Home() {
   const [error, setError] = useState("");
   const [heroContent, setHeroContent] = useState<PublishedContent | null>(null);
   const [promotion, setPromotion] = useState<PublishedContent | null>(null);
+  const [marketingPromotion, setMarketingPromotion] =
+    useState<ActiveMarketingPromotion | null>(null);
 
   const query = useMemo(() => {
     const params = new URLSearchParams({ page: String(page), page_size: "16" });
@@ -153,6 +171,7 @@ export default function Home() {
     api<Product[]>("/api/products/best-sellers?limit=12").then(setBestSellers).catch(() => undefined);
     api<PublishedContent | null>("/api/content/published?content_type=homepage_hero").then(setHeroContent).catch(() => undefined);
     api<PublishedContent | null>("/api/content/published?content_type=promotion").then(setPromotion).catch(() => undefined);
+    api<ActiveMarketingPromotion | null>("/api/marketing/promotions/active").then(setMarketingPromotion).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -161,6 +180,10 @@ export default function Home() {
   }, [requestedSearch]);
 
   useEffect(() => {
+    if (marketingPromotion) {
+      setPromotionProducts(marketingPromotion.products);
+      return;
+    }
     if (!promotion) {
       setPromotionProducts([]);
       return;
@@ -179,7 +202,7 @@ export default function Home() {
     api<ProductList>(`/api/products?${params.toString()}`)
       .then((result) => setPromotionProducts(result.items))
       .catch(() => setPromotionProducts([]));
-  }, [filters, promotion]);
+  }, [filters, marketingPromotion, promotion]);
 
   useEffect(() => {
     setProducts(null);
@@ -219,7 +242,40 @@ export default function Home() {
         </div>
       )}
 
-      {promotion && (
+      {marketingPromotion ? (
+        <>
+          <section className="content-promotion shell">
+            <div>
+              <p className="kicker">
+                {marketingPromotion.promotion_kind === "pack"
+                  ? "Pack NUTRIFIT"
+                  : "Offre NUTRIFIT"}
+              </p>
+              <h2>{marketingPromotion.title}</h2>
+              <strong>{marketingPromotion.headline}</strong>
+              <p>{marketingPromotion.message}</p>
+            </div>
+            <a href="#offres-marketing" className="button">
+              {marketingPromotion.cta_label || "Voir la sélection"}
+            </a>
+          </section>
+          <div
+            className="storefront-rail promotion-rail shell"
+            id="offres-marketing"
+          >
+            <ProductRail
+              eyebrow="Sélection validée par l'admin"
+              title={
+                marketingPromotion.promotion_kind === "pack"
+                  ? "Pack promotionnel"
+                  : "Produit en promotion"
+              }
+              subtitle="Produits choisis par Marketing Agent selon les ventes, le stock et la demande."
+              products={marketingPromotion.products}
+            />
+          </div>
+        </>
+      ) : promotion && (
         <>
           <section className="content-promotion shell">
             <div>

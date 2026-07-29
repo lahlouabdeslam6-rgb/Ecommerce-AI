@@ -93,6 +93,17 @@ class ProductStockUpdate(BaseModel):
     stock: int = Field(ge=0)
 
 
+class ProductCostUpdate(BaseModel):
+    cost_price: float = Field(ge=0)
+    currency: str = Field(default="MAD", min_length=3, max_length=3)
+
+
+class ProductCostResponse(BaseModel):
+    product_id: int
+    cost_price: float | None = None
+    currency: str = "MAD"
+
+
 class ProductImageResponse(BaseModel):
     url: str
 

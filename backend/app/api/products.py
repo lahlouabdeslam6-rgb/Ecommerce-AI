@@ -21,7 +21,10 @@ from app.db.sqlite import get_sqlite_session
 from app.models.user import User
 from app.repositories.analytics import AnalyticsRepository
 from app.repositories.operations import OperationsRepository
+from app.repositories.promotion_signals import PromotionSignalsRepository
 from app.schemas.product import (
+    ProductCostResponse,
+    ProductCostUpdate,
     ProductCreate,
     ProductListResponse,
     ProductImagesOrder,
@@ -187,6 +190,62 @@ async def manage_products(
         sort_by="newest",
         active_only=False,
     )
+
+
+@router.get("/costs/{product_id}", response_model=ProductCostResponse)
+async def get_product_cost(
+    product_id: int,
+    _: Annotated[User, Depends(require_roles("admin"))],
+    session: Annotated[AsyncSession, Depends(get_sqlite_session)],
+) -> ProductCostResponse:
+    await product_service.get_product(product_id)
+    cost = await PromotionSignalsRepository(session).get_cost(product_id)
+    return ProductCostResponse(
+        product_id=product_id,
+        cost_price=float(cost.cost_price) if cost else None,
+        currency=cost.currency if cost else "MAD",
+    )
+
+
+@router.put("/costs/{product_id}", response_model=ProductCostResponse)
+async def update_product_cost(
+    product_id: int,
+    data: ProductCostUpdate,
+    admin: Annotated[User, Depends(require_roles("admin"))],
+    session: Annotated[AsyncSession, Depends(get_sqlite_session)],
+) -> ProductCostResponse:
+    await product_service.get_product(product_id)
+    cost = await PromotionSignalsRepository(session).upsert_cost(
+        product_id=product_id,
+        cost_price=data.cost_price,
+        currency=data.currency.upper(),
+        updated_by=admin.id,
+    )
+    OperationsRepository(session).add_audit(
+        actor_id=admin.id,
+        actor_role=admin.role,
+        action="product.cost.updated",
+        entity_type="product",
+        entity_id=product_id,
+        details={"currency": cost.currency},
+    )
+    await session.commit()
+    return ProductCostResponse(
+        product_id=product_id,
+        cost_price=float(cost.cost_price),
+        currency=cost.currency,
+    )
+
+
+@router.post("/{product_id}/view", status_code=status.HTTP_204_NO_CONTENT)
+async def record_product_view(
+    product_id: int,
+    session: Annotated[AsyncSession, Depends(get_sqlite_session)],
+) -> Response:
+    await product_service.get_product(product_id)
+    PromotionSignalsRepository(session).add_view(product_id)
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/{product_id}", response_model=ProductResponse)

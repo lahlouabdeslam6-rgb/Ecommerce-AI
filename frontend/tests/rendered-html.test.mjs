@@ -257,6 +257,10 @@ test("published promotions filter the matching catalogue segment", async () => {
   );
   assert.match(source, /applyPromotionFilter/);
   assert.match(source, /promotionCriteria/);
+  assert.match(source, /\/api\/marketing\/promotions\/active/);
+  assert.match(source, /Pack promotionnel/);
+  assert.match(source, /Produit en promotion/);
+  assert.match(source, /marketingPromotion\.products/);
   assert.match(source, /setCategory\(criteria\.category\)/);
   assert.match(source, /setBrand\(criteria\.brand\)/);
   assert.match(source, /setFlavor\(criteria\.flavor\)/);
@@ -309,6 +313,17 @@ test("admin Marketing Agent keeps campaigns in a controlled approval flow", asyn
   assert.match(marketingSource, /Generer la campagne/);
   assert.match(marketingSource, /Enregistrer brouillon/);
   assert.match(marketingSource, /Valider la campagne/);
+  assert.match(marketingSource, /Produit unique/);
+  assert.match(marketingSource, /Pack de 2 a 4 produits/);
+  assert.match(marketingSource, /Automatique par Marketing Agent/);
+  assert.match(marketingSource, /Manuelle par admin/);
+  assert.match(marketingSource, /Proposer les produits avec le score/);
+  assert.match(marketingSource, /\/promotions\/suggest/);
+  assert.match(marketingSource, /discount_percentage/);
+  assert.match(marketingSource, /starts_at/);
+  assert.match(marketingSource, /ends_at/);
+  assert.match(marketingSource, /taux de conversion/i);
+  assert.match(marketingSource, /marge/i);
   assert.match(marketingSource, /Aucun message n'a ete envoye automatiquement/);
   assert.match(
     marketingSource,
@@ -344,6 +359,7 @@ test("Recommendation Agent appears on product detail and cart", async () => {
     ),
   ]);
   assert.match(detailSource, /RecommendationSection/);
+  assert.match(detailSource, /\/view/);
   assert.match(
     detailSource,
     /\/api\/recommendations\/products\/\$\{product\.product_id\}/,

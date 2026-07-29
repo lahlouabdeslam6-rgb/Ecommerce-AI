@@ -26,6 +26,7 @@ from app.api.orders import router as orders_router
 from app.api.operations import router as operations_router
 from app.api.order_verification import router as order_verification_router
 from app.api.products import router as products_router
+from app.api.promotions import router as promotions_router
 from app.api.recommendations import router as recommendations_router
 from app.api.support import router as support_router
 from app.api.support_agent import router as support_agent_router
@@ -133,6 +134,7 @@ async def security_and_observability(request: Request, call_next):
     return response
 
 app.include_router(products_router, prefix="/api")
+app.include_router(promotions_router, prefix="/api")
 app.include_router(recommendations_router, prefix="/api")
 app.include_router(ai_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")

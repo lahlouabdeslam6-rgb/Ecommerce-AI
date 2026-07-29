@@ -21,14 +21,14 @@ import type { Order, PaginatedOrders, Product, ProductList, User } from "../type
 
 type Dashboard = { users: number; products: number; active_products: number; low_stock_products: number; orders: number; pending_orders: number; delivered_orders: number; revenue_mad: number };
 type UserList = { items: User[]; total: number; page: number; page_size: number; total_pages: number };
-type ProductForm = { name: string; brand: string; category: string; description: string; price: number; stock: number; currency: string; is_active: boolean };
+type ProductForm = { name: string; brand: string; category: string; description: string; price: number; cost_price: number | null; stock: number; currency: string; is_active: boolean };
 type SupportForm = { full_name: string; email: string; password: string; is_active: boolean };
 type AuditLog = { id: number; actor_id: number | null; actor_email: string | null; actor_role: string; action: string; entity_type: string; entity_id: string | null; details: string | null; created_at: string };
 type AuditLogList = { items: AuditLog[]; total: number };
 type ProductAISuggestion = { product_id: number; model: string; cached: boolean; description: string; category: string; seo_title: string; seo_description: string; seo_keywords: string[]; tags: string[] };
 type ProductAIApplyResponse = { product: Product; indexed: boolean };
 
-const emptyProduct: ProductForm = { name: "", brand: "", category: "", description: "", price: 0, stock: 0, currency: "MAD", is_active: true };
+const emptyProduct: ProductForm = { name: "", brand: "", category: "", description: "", price: 0, cost_price: null, stock: 0, currency: "MAD", is_active: true };
 const emptySupport: SupportForm = { full_name: "", email: "", password: "", is_active: true };
 const orderStatuses = ["pending", "confirmed", "preparing", "shipped", "delivered", "delivery_failed", "cancelled"];
 
@@ -137,11 +137,18 @@ export default function AdminPage() {
   useEffect(() => {
     const productId = Number(productToEdit);
     if (user?.role !== "admin" || !Number.isInteger(productId) || productId < 1) return;
-    api<Product>(`/api/products/${productId}`)
-      .then((product) => {
+    Promise.all([
+      api<Product>(`/api/products/${productId}`),
+      api<{ cost_price: number | null }>(
+        `/api/products/costs/${productId}`,
+        {},
+        true,
+      ),
+    ])
+      .then(([product, cost]) => {
         setEditingId(product.product_id);
         setEditingProduct(product);
-        setProductForm({ name: product.name || "", brand: product.brand || "", category: product.category || "", description: product.description || "", price: product.price || 0, stock: product.stock, currency: product.currency, is_active: product.is_active });
+        setProductForm({ name: product.name || "", brand: product.brand || "", category: product.category || "", description: product.description || "", price: product.price || 0, cost_price: cost.cost_price, stock: product.stock, currency: product.currency, is_active: product.is_active });
         setAiSuggestion(null);
         setPendingMedia([]);
         setTab("product-editor");
@@ -149,10 +156,15 @@ export default function AdminPage() {
       .catch((err: Error) => setError(err.message));
   }, [user, productToEdit]);
 
-  const editProduct = (product: Product) => {
+  const editProduct = async (product: Product) => {
+    const cost = await api<{ cost_price: number | null }>(
+      `/api/products/costs/${product.product_id}`,
+      {},
+      true,
+    );
     setEditingId(product.product_id);
     setEditingProduct(product);
-    setProductForm({ name: product.name || "", brand: product.brand || "", category: product.category || "", description: product.description || "", price: product.price || 0, stock: product.stock, currency: product.currency, is_active: product.is_active });
+    setProductForm({ name: product.name || "", brand: product.brand || "", category: product.category || "", description: product.description || "", price: product.price || 0, cost_price: cost.cost_price, stock: product.stock, currency: product.currency, is_active: product.is_active });
     setAiSuggestion(null);
     setPendingMedia([]);
     setTab("product-editor");
@@ -183,11 +195,15 @@ export default function AdminPage() {
   const saveProduct = async (event: FormEvent) => {
     event.preventDefault(); setError("");
     try {
+      const { cost_price: costPrice, ...productPayload } = productForm;
+      let savedProductId: number;
       if (editingId) {
-        setEditingProduct(await api<Product>(`/api/products/${editingId}`, { method: "PATCH", body: JSON.stringify(productForm) }, true));
+        setEditingProduct(await api<Product>(`/api/products/${editingId}`, { method: "PATCH", body: JSON.stringify(productPayload) }, true));
+        savedProductId = editingId;
         setMessage("Produit mis a jour.");
       } else {
-        let created = await api<Product>("/api/products", { method: "POST", body: JSON.stringify({ ...productForm, images: [], videos: [], ingredients: [] }) }, true);
+        let created = await api<Product>("/api/products", { method: "POST", body: JSON.stringify({ ...productPayload, images: [], videos: [], ingredients: [] }) }, true);
+        savedProductId = created.product_id;
         setEditingId(created.product_id);
         setEditingProduct(created);
         if (pendingMedia.length) {
@@ -198,6 +214,19 @@ export default function AdminPage() {
           pendingMedia.length
             ? `Produit cree avec ${pendingMedia.length} media(s).`
             : "Produit cree.",
+        );
+      }
+      if (costPrice !== null) {
+        await api(
+          `/api/products/costs/${savedProductId}`,
+          {
+            method: "PUT",
+            body: JSON.stringify({
+              cost_price: costPrice,
+              currency: productForm.currency,
+            }),
+          },
+          true,
         );
       }
       setEditingId(null); setEditingProduct(null); setPendingMedia([]); setProductForm(emptyProduct); setTab("products"); router.replace("/admin"); await load();
@@ -383,7 +412,7 @@ export default function AdminPage() {
 
     {tab === "products" && <><Title kicker="Catalogue" title="Produits" action={<button className="button button-small" onClick={newProduct}>Ajouter un produit</button>} /><form className="panel admin-search-bar" onSubmit={searchProducts}><label>Rechercher un produit<input value={productSearch} onChange={(event) => setProductSearch(event.target.value)} placeholder="Nom ou marque du produit" /></label><button className="button button-small">Rechercher</button>{productSearch && <button type="button" className="text-link" onClick={() => { setProductSearch(""); void api<ProductList>("/api/products/manage?page_size=100", {}, true).then(setProducts); }}>Effacer</button>}</form>{!products?.items.length ? <div className="empty-state"><h3>Aucun produit trouvé</h3></div> : <div className="data-table"><div className="table-row table-head"><span>Produit</span><span>Prix</span><span>Stock</span><span>Statut</span><span /></div>{products.items.map((product) => <div className="table-row" key={product.product_id}><span><strong>{product.name}</strong><small>{product.brand}</small></span><span>{money(product.price || 0)}</span><span>{product.stock}</span><span><i className={product.is_active ? "dot active" : "dot"} />{product.is_active ? "Actif" : "Masque"}</span><span><button className="text-link" onClick={() => editProduct(product)}>Modifier</button></span></div>)}</div>}</>}
 
-    {tab === "product-editor" && <><Title kicker="Catalogue" title={editingId ? `Modifier #${editingId}` : "Nouveau produit"} action={<button className="text-link" onClick={() => { setPendingMedia([]); setTab("products"); }}>Retour</button>} /><form className="panel product-editor" onSubmit={saveProduct}><div className="form-grid"><label>Nom<input value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} required /></label><label>Marque<input value={productForm.brand} onChange={(e) => setProductForm({ ...productForm, brand: e.target.value })} required /></label><label>Categorie<input value={productForm.category} onChange={(e) => setProductForm({ ...productForm, category: e.target.value })} /></label><label>Prix MAD<input type="number" step="0.01" min="0" value={productForm.price} onChange={(e) => setProductForm({ ...productForm, price: Number(e.target.value) })} required /></label><label>Stock<input type="number" min="0" value={productForm.stock} onChange={(e) => setProductForm({ ...productForm, stock: Number(e.target.value) })} required /></label><label className="check-filter"><input type="checkbox" checked={productForm.is_active} onChange={(e) => setProductForm({ ...productForm, is_active: e.target.checked })} /><span>Produit actif</span></label><label className="full-field">Description<textarea value={productForm.description} onChange={(e) => setProductForm({ ...productForm, description: e.target.value })} /></label>{editingId && <div className="full-field ai-product-actions"><button type="button" className="button button-ai" onClick={generateProductSuggestion} disabled={generatingAI || applyingAI}>{generatingAI ? "Product Agent travaille..." : "Optimiser avec Product Agent"}</button><small>L'AI prepare une proposition. Aucune information ne change sans ta validation.</small></div>}{aiSuggestion && <section className="full-field ai-product-panel"><div className="ai-product-heading"><div><span>PRODUCT AGENT</span><strong>Proposition a valider</strong></div><small>{aiSuggestion.model}{aiSuggestion.cached ? " · cache" : ""}</small></div><div className="form-grid"><label>Categorie proposee<input value={aiSuggestion.category} onChange={(e) => setAiSuggestion((current) => current ? { ...current, category: e.target.value } : current)} /></label><label>Titre SEO<input value={aiSuggestion.seo_title} maxLength={70} onChange={(e) => setAiSuggestion((current) => current ? { ...current, seo_title: e.target.value } : current)} /></label><label className="full-field">Description produit<textarea value={aiSuggestion.description} maxLength={1500} onChange={(e) => setAiSuggestion((current) => current ? { ...current, description: e.target.value } : current)} /></label><label className="full-field">Description SEO<textarea value={aiSuggestion.seo_description} maxLength={180} onChange={(e) => setAiSuggestion((current) => current ? { ...current, seo_description: e.target.value } : current)} /></label><label>Mots-cles SEO<input value={aiSuggestion.seo_keywords.join(", ")} onChange={(e) => setAiSuggestion((current) => current ? { ...current, seo_keywords: splitTerms(e.target.value) } : current)} /></label><label>Tags<input value={aiSuggestion.tags.join(", ")} onChange={(e) => setAiSuggestion((current) => current ? { ...current, tags: splitTerms(e.target.value) } : current)} /></label></div><div className="ai-review-actions"><button type="button" className="button" onClick={applyProductSuggestion} disabled={applyingAI}>{applyingAI ? "Application..." : "Valider et appliquer"}</button><button type="button" className="text-link" onClick={() => setAiSuggestion(null)} disabled={applyingAI}>Ignorer</button></div></section>}<label className="full-field">Ajouter des photos ou vidéos<input type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime,video/x-m4v" multiple onChange={uploadMedia} /><small>Jusqu&apos;à 8 fichiers par envoi. Photo: 5 MB. Vidéo: 50 MB.</small></label>{!editingId && pendingMedia.length > 0 && <div className="full-field pending-media-note"><strong>{pendingMedia.length} média(s) sélectionné(s)</strong><small>Ces fichiers seront ajoutés automatiquement après la création du produit.</small></div>}{editingProduct && editingId && <div className="full-field"><strong>Médias actuels</strong><ProductImageManager product={editingProduct} onChange={setEditingProduct} onError={setError} /></div>}</div><div className="editor-actions"><button className="button">Enregistrer</button>{editingId && <button type="button" className="button button-danger" onClick={deleteProduct}>Supprimer</button>}</div></form></>}
+    {tab === "product-editor" && <><Title kicker="Catalogue" title={editingId ? `Modifier #${editingId}` : "Nouveau produit"} action={<button className="text-link" onClick={() => { setPendingMedia([]); setTab("products"); }}>Retour</button>} /><form className="panel product-editor" onSubmit={saveProduct}><div className="form-grid"><label>Nom<input value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} required /></label><label>Marque<input value={productForm.brand} onChange={(e) => setProductForm({ ...productForm, brand: e.target.value })} required /></label><label>Categorie<input value={productForm.category} onChange={(e) => setProductForm({ ...productForm, category: e.target.value })} /></label><label>Prix de vente MAD<input type="number" step="0.01" min="0" value={productForm.price} onChange={(e) => setProductForm({ ...productForm, price: Number(e.target.value) })} required /></label><label>Prix d&apos;achat MAD (admin)<input type="number" step="0.01" min="0" value={productForm.cost_price ?? ""} onChange={(e) => setProductForm({ ...productForm, cost_price: e.target.value ? Number(e.target.value) : null })} /><small>Utilise uniquement pour calculer la marge des promotions.</small></label><label>Stock<input type="number" min="0" value={productForm.stock} onChange={(e) => setProductForm({ ...productForm, stock: Number(e.target.value) })} required /></label><label className="check-filter"><input type="checkbox" checked={productForm.is_active} onChange={(e) => setProductForm({ ...productForm, is_active: e.target.checked })} /><span>Produit actif</span></label><label className="full-field">Description<textarea value={productForm.description} onChange={(e) => setProductForm({ ...productForm, description: e.target.value })} /></label>{editingId && <div className="full-field ai-product-actions"><button type="button" className="button button-ai" onClick={generateProductSuggestion} disabled={generatingAI || applyingAI}>{generatingAI ? "Product Agent travaille..." : "Optimiser avec Product Agent"}</button><small>L'AI prepare une proposition. Aucune information ne change sans ta validation.</small></div>}{aiSuggestion && <section className="full-field ai-product-panel"><div className="ai-product-heading"><div><span>PRODUCT AGENT</span><strong>Proposition a valider</strong></div><small>{aiSuggestion.model}{aiSuggestion.cached ? " · cache" : ""}</small></div><div className="form-grid"><label>Categorie proposee<input value={aiSuggestion.category} onChange={(e) => setAiSuggestion((current) => current ? { ...current, category: e.target.value } : current)} /></label><label>Titre SEO<input value={aiSuggestion.seo_title} maxLength={70} onChange={(e) => setAiSuggestion((current) => current ? { ...current, seo_title: e.target.value } : current)} /></label><label className="full-field">Description produit<textarea value={aiSuggestion.description} maxLength={1500} onChange={(e) => setAiSuggestion((current) => current ? { ...current, description: e.target.value } : current)} /></label><label className="full-field">Description SEO<textarea value={aiSuggestion.seo_description} maxLength={180} onChange={(e) => setAiSuggestion((current) => current ? { ...current, seo_description: e.target.value } : current)} /></label><label>Mots-cles SEO<input value={aiSuggestion.seo_keywords.join(", ")} onChange={(e) => setAiSuggestion((current) => current ? { ...current, seo_keywords: splitTerms(e.target.value) } : current)} /></label><label>Tags<input value={aiSuggestion.tags.join(", ")} onChange={(e) => setAiSuggestion((current) => current ? { ...current, tags: splitTerms(e.target.value) } : current)} /></label></div><div className="ai-review-actions"><button type="button" className="button" onClick={applyProductSuggestion} disabled={applyingAI}>{applyingAI ? "Application..." : "Valider et appliquer"}</button><button type="button" className="text-link" onClick={() => setAiSuggestion(null)} disabled={applyingAI}>Ignorer</button></div></section>}<label className="full-field">Ajouter des photos ou vidéos<input type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime,video/x-m4v" multiple onChange={uploadMedia} /><small>Jusqu&apos;à 8 fichiers par envoi. Photo: 5 MB. Vidéo: 50 MB.</small></label>{!editingId && pendingMedia.length > 0 && <div className="full-field pending-media-note"><strong>{pendingMedia.length} média(s) sélectionné(s)</strong><small>Ces fichiers seront ajoutés automatiquement après la création du produit.</small></div>}{editingProduct && editingId && <div className="full-field"><strong>Médias actuels</strong><ProductImageManager product={editingProduct} onChange={setEditingProduct} onError={setError} /></div>}</div><div className="editor-actions"><button className="button">Enregistrer</button>{editingId && <button type="button" className="button button-danger" onClick={deleteProduct}>Supprimer</button>}</div></form></>}
 
     {tab === "content-seo" && <><ContentAgentWorkspace /><SEOAgentWorkspace /></>}
 

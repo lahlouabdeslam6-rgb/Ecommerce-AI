@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RecommendationSection } from "../../components/RecommendationSection";
 import { useAuth } from "../../components/AuthProvider";
 import { api, assetUrl, money } from "../../lib/api";
@@ -16,12 +16,20 @@ export default function ProductDetailPage() {
   const [selectedMedia, setSelectedMedia] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [error, setError] = useState("");
+  const recordedView = useRef<number | null>(null);
 
   useEffect(() => {
     api<Product>(`/api/products/${params.id}`)
       .then((item) => {
         setProduct(item);
         setSelectedMedia(item.videos?.[0] || item.images?.[0] || "");
+        if (recordedView.current !== item.product_id) {
+          recordedView.current = item.product_id;
+          void api<void>(
+            `/api/products/${item.product_id}/view`,
+            { method: "POST" },
+          ).catch(() => undefined);
+        }
       })
       .catch((requestError: Error) => setError(requestError.message));
   }, [params.id]);

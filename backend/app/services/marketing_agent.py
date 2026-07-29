@@ -21,9 +21,11 @@ from app.schemas.marketing import (
     MarketingCampaignUpdate,
     MarketingGenerateRequest,
     MarketingGeneratedFields,
+    PromotionProductScore,
 )
 from app.services.ai_infrastructure import AIInfrastructureService
 from app.services.product import ProductService
+from app.services.promotion_scoring import PromotionScoringService
 
 
 logger = logging.getLogger("nutrifit.marketing_agent")
@@ -67,6 +69,14 @@ class MarketingAgentService:
         self.repository = MarketingRepository(session)
 
     async def preview(self, data: MarketingGenerateRequest) -> MarketingGeneratedFields:
+        prepared, scores = await self._prepare_selection(data)
+        return await self._preview_prepared(prepared, scores)
+
+    async def _preview_prepared(
+        self,
+        data: MarketingGenerateRequest,
+        scores: list[PromotionProductScore],
+    ) -> MarketingGeneratedFields:
         infrastructure = await AIInfrastructureService().status()
         if infrastructure.ollama != "healthy" or not infrastructure.models_ready:
             raise HTTPException(
@@ -74,10 +84,12 @@ class MarketingAgentService:
                 "Ollama or required models are not ready",
             )
 
-        product_context: dict[str, Any] | None = None
-        if data.product_id is not None:
-            product = await ProductService().get_product(data.product_id)
-            product_context = {
+        requested_ids = data.product_ids or (
+            [data.product_id] if data.product_id else []
+        )
+        products = await ProductService().get_products(requested_ids)
+        product_context = [
+            {
                 "product_id": product.product_id,
                 "name": product.name,
                 "brand": product.brand,
@@ -92,10 +104,15 @@ class MarketingAgentService:
                     if ingredient.name
                 ],
             }
+            for product in products
+        ]
 
         context = {
             **data.model_dump(mode="json"),
-            "product": product_context,
+            "products": product_context,
+            "selection_scores": [
+                item.model_dump(mode="json") for item in scores
+            ],
         }
         prompt = (
             "Tu es Marketing Agent de NUTRIFIT, marque premium de nutrition "
@@ -132,12 +149,21 @@ class MarketingAgentService:
         *,
         created_by: int,
     ) -> MarketingCampaignResponse:
-        generated = await self.preview(data)
+        prepared, scores = await self._prepare_selection(data)
+        generated = await self._preview_prepared(prepared, scores)
 
         campaign = await self.repository.create(
             {
-                **data.model_dump(mode="json"),
+                **prepared.model_dump(mode="json"),
                 **generated.model_dump(mode="json"),
+                "product_id": (
+                    prepared.product_ids[0]
+                    if prepared.product_ids
+                    else prepared.product_id
+                ),
+                "selection_scores": [
+                    item.model_dump(mode="json") for item in scores
+                ],
                 "status": "draft",
                 "model": settings.ollama_chat_model,
                 "created_by": created_by,
@@ -146,6 +172,44 @@ class MarketingAgentService:
             }
         )
         return MarketingCampaignResponse.model_validate(campaign)
+
+    async def _prepare_selection(
+        self,
+        data: MarketingGenerateRequest,
+    ) -> tuple[MarketingGenerateRequest, list[PromotionProductScore]]:
+        if data.campaign_type != "promotion":
+            return data, []
+        suggestion = await PromotionScoringService(self.session).suggest(
+            promotion_kind=data.promotion_kind or "single_product",
+            product_ids=(
+                data.product_ids
+                if data.selection_mode == "manual"
+                else None
+            ),
+        )
+        selected_ids = [
+            item.product_id for item in suggestion.products
+        ]
+        discount = (
+            data.discount_percentage
+            if data.discount_percentage is not None
+            else suggestion.suggested_discount_percentage
+        )
+        offer_details = data.offer_details
+        if not offer_details and discount:
+            offer_details = (
+                f"Proposition de reduction de {discount:g}% soumise "
+                "a validation admin."
+            )
+        prepared = data.model_copy(
+            update={
+                "product_id": selected_ids[0] if selected_ids else None,
+                "product_ids": selected_ids,
+                "discount_percentage": discount,
+                "offer_details": offer_details,
+            }
+        )
+        return prepared, suggestion.products
 
     async def list(
         self,
@@ -181,6 +245,41 @@ class MarketingAgentService:
         values = data.model_dump(exclude_unset=True, mode="json")
         if not values:
             return MarketingCampaignResponse.model_validate(campaign)
+        if "product_ids" in values or "promotion_kind" in values:
+            promotion_kind = values.get(
+                "promotion_kind",
+                campaign.promotion_kind or "single_product",
+            )
+            product_ids = values.get("product_ids", campaign.product_ids)
+            if promotion_kind == "single_product" and len(product_ids) != 1:
+                raise HTTPException(
+                    status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    "A single-product promotion needs exactly one product",
+                )
+            if promotion_kind == "pack" and not 2 <= len(product_ids) <= 4:
+                raise HTTPException(
+                    status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    "A pack needs two to four products",
+                )
+            suggestion = await PromotionScoringService(self.session).suggest(
+                promotion_kind=promotion_kind,
+                product_ids=product_ids,
+            )
+            values["product_id"] = suggestion.products[0].product_id
+            values["product_ids"] = [
+                item.product_id for item in suggestion.products
+            ]
+            values["selection_scores"] = [
+                item.model_dump(mode="json")
+                for item in suggestion.products
+            ]
+        starts_at = values.get("starts_at", campaign.starts_at)
+        ends_at = values.get("ends_at", campaign.ends_at)
+        if starts_at and ends_at and ends_at <= starts_at:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "Promotion end date must be after start date",
+            )
         if "hashtags" in values:
             values["hashtags"] = self._clean_hashtags(values["hashtags"])
         updated = await self.repository.update(campaign, values)
@@ -198,11 +297,56 @@ class MarketingAgentService:
     ) -> MarketingCampaignResponse:
         campaign = await self._get_or_404(campaign_id)
         self._validate_channels(campaign)
+        await self._validate_promotion(campaign)
         approved = await self.repository.approve(
             campaign,
             approved_by=approved_by,
         )
         return MarketingCampaignResponse.model_validate(approved)
+
+    async def _validate_promotion(
+        self,
+        campaign: AIMarketingCampaign,
+    ) -> None:
+        if campaign.campaign_type != "promotion":
+            return
+        product_ids = campaign.product_ids or (
+            [campaign.product_id] if campaign.product_id else []
+        )
+        kind = campaign.promotion_kind or "single_product"
+        if kind == "single_product" and len(product_ids) != 1:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "Choose exactly one product before activation",
+            )
+        if kind == "pack" and not 2 <= len(product_ids) <= 4:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "Choose two to four products before pack activation",
+            )
+        scoring = PromotionScoringService(self.session)
+        suggestion = await scoring.suggest(
+            promotion_kind=kind,
+            product_ids=product_ids,
+        )
+        if campaign.discount_percentage is None:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "Confirm the promotion discount before activation",
+            )
+        await scoring.validate_discount_margin(
+            products=suggestion.products,
+            discount_percentage=campaign.discount_percentage,
+        )
+        if (
+            campaign.starts_at
+            and campaign.ends_at
+            and campaign.ends_at <= campaign.starts_at
+        ):
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "Promotion end date must be after start date",
+            )
 
     async def archive(self, campaign_id: int) -> MarketingCampaignResponse:
         campaign = await self._get_or_404(campaign_id)

@@ -12,12 +12,31 @@ from app.schemas.marketing import (
     MarketingCampaignResponse,
     MarketingCampaignUpdate,
     MarketingGenerateRequest,
+    PromotionSuggestionRequest,
+    PromotionSuggestionResponse,
 )
 from app.services.marketing_agent import MarketingAgentService
+from app.services.product import ProductService
+from app.services.promotion_scoring import PromotionScoringService
 from app.services.safety_agent import SafetyAgentService
 
 
 router = APIRouter(prefix="/admin/ai/marketing", tags=["AI Marketing"])
+
+
+@router.post(
+    "/promotions/suggest",
+    response_model=PromotionSuggestionResponse,
+)
+async def suggest_promotion(
+    data: PromotionSuggestionRequest,
+    _: Annotated[User, Depends(require_roles("admin"))],
+    session: Annotated[AsyncSession, Depends(get_sqlite_session)],
+) -> PromotionSuggestionResponse:
+    return await PromotionScoringService(session).suggest(
+        promotion_kind=data.promotion_kind,
+        product_ids=data.product_ids or None,
+    )
 
 
 @router.get("/campaigns", response_model=MarketingCampaignListResponse)
@@ -100,6 +119,22 @@ async def approve_campaign(
 ) -> MarketingCampaignResponse:
     service = MarketingAgentService(session)
     draft = await service.get(campaign_id)
+    selected_products = await ProductService().get_products(draft.product_ids)
+    product_safety_text = "\n".join(
+        " | ".join(
+            [
+                product.name or f"Produit #{product.product_id}",
+                product.category or "",
+                product.description or "",
+                ", ".join(
+                    ingredient.name
+                    for ingredient in product.ingredients[:20]
+                    if ingredient.name
+                ),
+            ]
+        )
+        for product in selected_products
+    )
     safety_text = "\n".join(
         value
         for value in (
@@ -112,6 +147,7 @@ async def approve_campaign(
             draft.social_caption,
             draft.cta_label,
             " ".join(draft.hashtags),
+            product_safety_text,
         )
         if value
     )

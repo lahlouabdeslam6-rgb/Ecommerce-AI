@@ -2,7 +2,7 @@ import json
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import or_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.ai_marketing import AIMarketingCampaign
@@ -16,10 +16,17 @@ class MarketingRepository:
         values = dict(data)
         channels = values.pop("channels", [])
         hashtags = values.pop("hashtags", [])
+        product_ids = values.pop("product_ids", [])
+        selection_scores = values.pop("selection_scores", [])
         campaign = AIMarketingCampaign(
             **values,
             channels_json=json.dumps(channels, ensure_ascii=False),
             hashtags_json=json.dumps(hashtags, ensure_ascii=False),
+            product_ids_json=json.dumps(product_ids),
+            selection_scores_json=json.dumps(
+                selection_scores,
+                ensure_ascii=False,
+            ),
         )
         self.session.add(campaign)
         await self.session.flush()
@@ -81,6 +88,15 @@ class MarketingRepository:
                 values.pop("hashtags") or [],
                 ensure_ascii=False,
             )
+        if "product_ids" in values:
+            campaign.product_ids_json = json.dumps(
+                values.pop("product_ids") or []
+            )
+        if "selection_scores" in values:
+            campaign.selection_scores_json = json.dumps(
+                values.pop("selection_scores") or [],
+                ensure_ascii=False,
+            )
         for field, value in values.items():
             setattr(campaign, field, value)
         campaign.status = "draft"
@@ -90,6 +106,33 @@ class MarketingRepository:
         await self.session.flush()
         await self.session.refresh(campaign)
         return campaign
+
+    async def latest_active_promotion(
+        self,
+        *,
+        now: datetime,
+    ) -> AIMarketingCampaign | None:
+        result = await self.session.execute(
+            select(AIMarketingCampaign)
+            .where(
+                AIMarketingCampaign.campaign_type == "promotion",
+                AIMarketingCampaign.status == "approved",
+                or_(
+                    AIMarketingCampaign.starts_at.is_(None),
+                    AIMarketingCampaign.starts_at <= now,
+                ),
+                or_(
+                    AIMarketingCampaign.ends_at.is_(None),
+                    AIMarketingCampaign.ends_at >= now,
+                ),
+            )
+            .order_by(
+                AIMarketingCampaign.approved_at.desc(),
+                AIMarketingCampaign.id.desc(),
+            )
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
 
     async def approve(
         self,

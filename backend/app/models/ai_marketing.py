@@ -1,7 +1,7 @@
 import json
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.sqlite import Base
@@ -17,6 +17,23 @@ class AIMarketingCampaign(Base):
     audience: Mapped[str] = mapped_column(String(160))
     tone: Mapped[str] = mapped_column(String(30), default="premium")
     product_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    promotion_kind: Mapped[str | None] = mapped_column(
+        String(30), nullable=True, index=True
+    )
+    selection_mode: Mapped[str | None] = mapped_column(
+        String(30), nullable=True
+    )
+    product_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    selection_scores_json: Mapped[str] = mapped_column(Text, default="[]")
+    discount_percentage: Mapped[float | None] = mapped_column(
+        Float, nullable=True
+    )
+    starts_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+    ends_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
     offer_details: Mapped[str | None] = mapped_column(String(500), nullable=True)
     channels_json: Mapped[str] = mapped_column(Text, default="[]")
     campaign_title: Mapped[str] = mapped_column(String(180))
@@ -65,6 +82,22 @@ class AIMarketingCampaign(Base):
     @property
     def hashtags(self) -> list[str]:
         return self._json_list(self.hashtags_json)
+
+    @property
+    def product_ids(self) -> list[int]:
+        return [
+            int(value)
+            for value in self._json_list(self.product_ids_json)
+            if isinstance(value, int) or str(value).isdigit()
+        ]
+
+    @property
+    def selection_scores(self) -> list[dict]:
+        try:
+            result = json.loads(self.selection_scores_json)
+            return result if isinstance(result, list) else []
+        except json.JSONDecodeError:
+            return []
 
     @staticmethod
     def _json_list(value: str) -> list[str]:

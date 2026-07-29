@@ -7,6 +7,7 @@ from app.models.ai_safety import AISafetyReview
 from app.models.automation import AutomationOutbox
 from app.models.operations import AuditLog, Notification, StockMovement
 from app.models.order import Order, OrderItem
+from app.models.promotion_signal import ProductCost, ProductView
 from app.models.support_ticket import SupportMessage, SupportTicket
 from app.models.user import User
 
@@ -21,6 +22,8 @@ __all__ = [
     "StockMovement",
     "Order",
     "OrderItem",
+    "ProductCost",
+    "ProductView",
     "SupportMessage",
     "SupportTicket",
     "User",

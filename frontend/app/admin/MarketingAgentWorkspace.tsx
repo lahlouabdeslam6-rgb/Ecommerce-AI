@@ -12,6 +12,13 @@ type MarketingCampaign = {
   tone: string;
   channels: string[];
   product_id: number | null;
+  promotion_kind: "single_product" | "pack" | null;
+  selection_mode: "automatic" | "manual" | null;
+  product_ids: number[];
+  selection_scores: PromotionProductScore[];
+  discount_percentage: number | null;
+  starts_at: string | null;
+  ends_at: string | null;
   offer_details: string | null;
   campaign_title: string;
   headline: string;
@@ -42,8 +49,48 @@ type GenerateForm = {
   audience: string;
   tone: string;
   channels: string[];
-  product_id: string;
+  promotion_kind: "single_product" | "pack";
+  selection_mode: "automatic" | "manual";
+  product_ids: number[];
+  discount_percentage: string;
+  starts_at: string;
+  ends_at: string;
   offer_details: string;
+};
+
+type PromotionProductScore = {
+  product_id: number;
+  name: string;
+  brand: string | null;
+  category: string | null;
+  price: number;
+  currency: string;
+  stock: number;
+  score: number;
+  reasons: string[];
+};
+
+type PromotionSuggestion = {
+  promotion_kind: "single_product" | "pack";
+  products: PromotionProductScore[];
+  regular_total: number;
+  suggested_discount_percentage: number;
+  suggested_price: number;
+  currency: string;
+  data_notes: string[];
+};
+
+type ProductOption = {
+  product_id: number;
+  name: string | null;
+  brand: string | null;
+  price: number | null;
+  currency: string;
+  stock: number;
+};
+
+type ProductOptionList = {
+  items: ProductOption[];
 };
 
 const campaignTypes = [
@@ -67,7 +114,12 @@ const emptyGenerate: GenerateForm = {
   audience: "sportifs au Maroc",
   tone: "premium",
   channels: ["instagram"],
-  product_id: "",
+  promotion_kind: "single_product",
+  selection_mode: "automatic",
+  product_ids: [],
+  discount_percentage: "",
+  starts_at: "",
+  ends_at: "",
   offer_details: "",
 };
 
@@ -77,6 +129,10 @@ export function MarketingAgentWorkspace() {
   const [form, setForm] = useState<GenerateForm>(emptyGenerate);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestion, setSuggestion] = useState<PromotionSuggestion | null>(null);
+  const [productSearch, setProductSearch] = useState("");
+  const [productOptions, setProductOptions] = useState<ProductOption[]>([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -100,6 +156,67 @@ export function MarketingAgentWorkspace() {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    if (form.campaign_type !== "promotion") return;
+    const timer = window.setTimeout(() => {
+      const params = new URLSearchParams({
+        page: "1",
+        page_size: "12",
+        in_stock: "true",
+        sort_by: "stock_desc",
+      });
+      if (productSearch.trim()) params.set("search", productSearch.trim());
+      api<ProductOptionList>(`/api/products?${params.toString()}`)
+        .then((result) => setProductOptions(result.items))
+        .catch(() => setProductOptions([]));
+    }, 220);
+    return () => window.clearTimeout(timer);
+  }, [form.campaign_type, productSearch]);
+
+  const togglePromotionProduct = (productId: number) => {
+    setForm((current) => {
+      if (current.promotion_kind === "single_product") {
+        return { ...current, product_ids: [productId] };
+      }
+      const selected = current.product_ids.includes(productId)
+        ? current.product_ids.filter((item) => item !== productId)
+        : [...current.product_ids, productId].slice(0, 4);
+      return { ...current, product_ids: selected };
+    });
+    setSuggestion(null);
+  };
+
+  const suggestPromotion = async () => {
+    setSuggesting(true);
+    setError("");
+    try {
+      const result = await api<PromotionSuggestion>(
+        "/api/admin/ai/marketing/promotions/suggest",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            promotion_kind: form.promotion_kind,
+            product_ids:
+              form.selection_mode === "manual" ? form.product_ids : [],
+          }),
+        },
+        true,
+      );
+      setSuggestion(result);
+      setForm((current) => ({
+        ...current,
+        product_ids: result.products.map((item) => item.product_id),
+        discount_percentage:
+          current.discount_percentage ||
+          String(result.suggested_discount_percentage),
+      }));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSuggesting(false);
+    }
+  };
 
   const toggleFormChannel = (channel: string) => {
     setForm((current) => ({
@@ -136,7 +253,18 @@ export function MarketingAgentWorkspace() {
           method: "POST",
           body: JSON.stringify({
             ...form,
-            product_id: form.product_id ? Number(form.product_id) : null,
+            product_id: form.product_ids[0] || null,
+            product_ids:
+              form.selection_mode === "manual" ? form.product_ids : [],
+            discount_percentage: form.discount_percentage
+              ? Number(form.discount_percentage)
+              : null,
+            starts_at: form.starts_at
+              ? new Date(form.starts_at).toISOString()
+              : null,
+            ends_at: form.ends_at
+              ? new Date(form.ends_at).toISOString()
+              : null,
             offer_details: form.offer_details || null,
           }),
         },
@@ -173,6 +301,12 @@ export function MarketingAgentWorkspace() {
           cta_label: selected.cta_label,
           hashtags: selected.hashtags,
           recommended_schedule: selected.recommended_schedule,
+          promotion_kind: selected.promotion_kind,
+          selection_mode: selected.selection_mode,
+          product_ids: selected.product_ids,
+          discount_percentage: selected.discount_percentage,
+          starts_at: selected.starts_at,
+          ends_at: selected.ends_at,
         }),
       },
       true,
@@ -258,7 +392,9 @@ export function MarketingAgentWorkspace() {
         <strong>Validation admin + Safety AI</strong>
         <span>
           L&apos;AI prepare les textes. Safety Agent les controle avant
-          validation, et aucun message n&apos;est envoye automatiquement.
+          validation. Pour les promotions, le score utilise ventes, stock,
+          tendance, taux de conversion, marge disponible et achats ensemble.
+          Aucun message n&apos;est envoye automatiquement.
         </span>
       </div>
       {message && <div className="alert alert-success">{message}</div>}
@@ -336,18 +472,196 @@ export function MarketingAgentWorkspace() {
                   required
                 />
               </label>
-              <label>
-                Produit lie (optionnel)
-                <input
-                  type="number"
-                  min="1"
-                  value={form.product_id}
-                  onChange={(event) =>
-                    setForm({ ...form, product_id: event.target.value })
-                  }
-                  placeholder="ID produit"
-                />
-              </label>
+              {form.campaign_type === "promotion" && (
+                <>
+                  <label>
+                    Format de la promotion
+                    <select
+                      value={form.promotion_kind}
+                      onChange={(event) => {
+                        const promotionKind = event.target.value as
+                          | "single_product"
+                          | "pack";
+                        setForm({
+                          ...form,
+                          promotion_kind: promotionKind,
+                          product_ids:
+                            promotionKind === "single_product"
+                              ? form.product_ids.slice(0, 1)
+                              : form.product_ids,
+                        });
+                        setSuggestion(null);
+                      }}
+                    >
+                      <option value="single_product">Produit unique</option>
+                      <option value="pack">Pack de 2 a 4 produits</option>
+                    </select>
+                  </label>
+                  <label>
+                    Selection des produits
+                    <select
+                      value={form.selection_mode}
+                      onChange={(event) => {
+                        setForm({
+                          ...form,
+                          selection_mode: event.target.value as
+                            | "automatic"
+                            | "manual",
+                        });
+                        setSuggestion(null);
+                      }}
+                    >
+                      <option value="automatic">
+                        Automatique par Marketing Agent
+                      </option>
+                      <option value="manual">Manuelle par admin</option>
+                    </select>
+                  </label>
+                  {form.selection_mode === "manual" && (
+                    <div className="full-field promotion-product-picker">
+                      <label>
+                        Rechercher les produits
+                        <input
+                          value={productSearch}
+                          onChange={(event) =>
+                            setProductSearch(event.target.value)
+                          }
+                          placeholder="Nom ou marque..."
+                        />
+                      </label>
+                      <div className="promotion-product-options">
+                        {productOptions.map((product) => (
+                          <button
+                            type="button"
+                            key={product.product_id}
+                            className={
+                              form.product_ids.includes(product.product_id)
+                                ? "selected"
+                                : ""
+                            }
+                            onClick={() =>
+                              togglePromotionProduct(product.product_id)
+                            }
+                          >
+                            <span>
+                              <strong>
+                                {product.name || `Produit #${product.product_id}`}
+                              </strong>
+                              <small>
+                                {product.brand || "NUTRIFIT"} · {product.stock} en stock
+                              </small>
+                            </span>
+                            <b>
+                              {product.price?.toFixed(2)} {product.currency}
+                            </b>
+                          </button>
+                        ))}
+                      </div>
+                      <small className="muted">
+                        {form.product_ids.length} produit(s) selectionne(s)
+                      </small>
+                    </div>
+                  )}
+                  <label>
+                    Reduction proposee
+                    <input
+                      type="number"
+                      min="0"
+                      max="50"
+                      step="0.5"
+                      value={form.discount_percentage}
+                      onChange={(event) =>
+                        setForm({
+                          ...form,
+                          discount_percentage: event.target.value,
+                        })
+                      }
+                      placeholder="Ex: 10"
+                    />
+                  </label>
+                  <label>
+                    Debut de la promotion
+                    <input
+                      type="datetime-local"
+                      value={form.starts_at}
+                      onChange={(event) =>
+                        setForm({ ...form, starts_at: event.target.value })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Fin de la promotion
+                    <input
+                      type="datetime-local"
+                      value={form.ends_at}
+                      onChange={(event) =>
+                        setForm({ ...form, ends_at: event.target.value })
+                      }
+                    />
+                  </label>
+                  <div className="full-field promotion-suggestion-actions">
+                    <button
+                      type="button"
+                      className="button button-secondary"
+                      onClick={suggestPromotion}
+                      disabled={suggesting}
+                    >
+                      {suggesting
+                        ? "Analyse en cours..."
+                        : form.selection_mode === "automatic"
+                          ? "Proposer les produits avec le score"
+                          : "Verifier ma selection"}
+                    </button>
+                  </div>
+                  {suggestion && (
+                    <div className="full-field promotion-score-preview">
+                      <div className="content-panel-title">
+                        <div>
+                          <span>SCORE MARKETING</span>
+                          <strong>
+                            {suggestion.promotion_kind === "pack"
+                              ? "Pack recommande"
+                              : "Produit recommande"}
+                          </strong>
+                        </div>
+                        <b>
+                          {suggestion.suggested_price.toFixed(2)}{" "}
+                          {suggestion.currency}
+                        </b>
+                      </div>
+                      {suggestion.products.map((product) => (
+                        <article key={product.product_id}>
+                          <div>
+                            <strong>{product.name}</strong>
+                            <small>
+                              #{product.product_id} · {product.stock} en stock
+                            </small>
+                          </div>
+                          <span>{product.score}/100</span>
+                          <small>{product.reasons.join(" · ")}</small>
+                        </article>
+                      ))}
+                      <p>
+                        Prix normal:{" "}
+                        <strong>
+                          {suggestion.regular_total.toFixed(2)}{" "}
+                          {suggestion.currency}
+                        </strong>
+                        {" · "}
+                        Reduction suggeree:{" "}
+                        <strong>
+                          {suggestion.suggested_discount_percentage}%
+                        </strong>
+                      </p>
+                      <ul>
+                        {suggestion.data_notes.map((note) => (
+                          <li key={note}>{note}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </>
+              )}
               <label className="full-field">
                 Offre exacte (optionnel)
                 <input
@@ -405,7 +719,7 @@ export function MarketingAgentWorkspace() {
                     onClick={() => setSelected(item)}
                   >
                     <span className={`content-status status-${item.status}`}>
-                      {item.status}
+                      {campaignStatusLabel(item)}
                     </span>
                     <strong>{item.campaign_title}</strong>
                     <small>
@@ -436,7 +750,7 @@ export function MarketingAgentWorkspace() {
                   <strong>Campagne #{selected.id}</strong>
                 </div>
                 <span className={`content-status status-${selected.status}`}>
-                  {selected.status}
+                  {campaignStatusLabel(selected)}
                 </span>
               </div>
               <div className="content-meta">
@@ -444,6 +758,123 @@ export function MarketingAgentWorkspace() {
                 <span>{selected.tone}</span>
                 <span>{selected.campaign_type}</span>
               </div>
+              {selected.campaign_type === "promotion" && (
+                <div className="marketing-copy-block promotion-review-block">
+                  <strong>Configuration de la promotion</strong>
+                  <div className="form-grid">
+                    <label>
+                      Format
+                      <select
+                        value={selected.promotion_kind || "single_product"}
+                        onChange={(event) =>
+                          updateSelected({
+                            promotion_kind: event.target.value as
+                              | "single_product"
+                              | "pack",
+                            product_ids:
+                              event.target.value === "single_product"
+                                ? selected.product_ids.slice(0, 1)
+                                : selected.product_ids,
+                          })
+                        }
+                      >
+                        <option value="single_product">Produit unique</option>
+                        <option value="pack">Pack</option>
+                      </select>
+                    </label>
+                    <label>
+                      Selection
+                      <select
+                        value={selected.selection_mode || "automatic"}
+                        onChange={(event) =>
+                          updateSelected({
+                            selection_mode: event.target.value as
+                              | "automatic"
+                              | "manual",
+                          })
+                        }
+                      >
+                        <option value="automatic">Marketing Agent</option>
+                        <option value="manual">Admin</option>
+                      </select>
+                    </label>
+                    <label className="full-field">
+                      IDs produits selectionnes
+                      <input
+                        value={selected.product_ids.join(", ")}
+                        onChange={(event) =>
+                          updateSelected({
+                            product_ids: event.target.value
+                              .split(/[,\s]+/)
+                              .map((item) => Number(item))
+                              .filter((item) => Number.isInteger(item) && item > 0)
+                              .slice(0, 4),
+                          })
+                        }
+                      />
+                    </label>
+                    <label>
+                      Reduction (%)
+                      <input
+                        type="number"
+                        min="0"
+                        max="50"
+                        step="0.5"
+                        value={selected.discount_percentage ?? ""}
+                        onChange={(event) =>
+                          updateSelected({
+                            discount_percentage: event.target.value
+                              ? Number(event.target.value)
+                              : null,
+                          })
+                        }
+                      />
+                    </label>
+                    <label>
+                      Debut
+                      <input
+                        type="datetime-local"
+                        value={toLocalDateTime(selected.starts_at)}
+                        onChange={(event) =>
+                          updateSelected({
+                            starts_at: event.target.value
+                              ? new Date(event.target.value).toISOString()
+                              : null,
+                          })
+                        }
+                      />
+                    </label>
+                    <label>
+                      Fin
+                      <input
+                        type="datetime-local"
+                        value={toLocalDateTime(selected.ends_at)}
+                        onChange={(event) =>
+                          updateSelected({
+                            ends_at: event.target.value
+                              ? new Date(event.target.value).toISOString()
+                              : null,
+                          })
+                        }
+                      />
+                    </label>
+                  </div>
+                  <div className="promotion-score-list">
+                    {selected.selection_scores.map((product) => (
+                      <article key={product.product_id}>
+                        <strong>{product.name}</strong>
+                        <span>{product.score}/100</span>
+                        <small>{product.reasons.join(" · ")}</small>
+                      </article>
+                    ))}
+                  </div>
+                  <small className="muted">
+                    Validation admin obligatoire. La marge doit etre verifiee
+                    tant que le cout d&apos;achat produit n&apos;est pas
+                    renseigne.
+                  </small>
+                </div>
+              )}
               <fieldset className="channel-selector review-channels">
                 <legend>Canaux valides</legend>
                 <div className="marketing-channel-grid">
@@ -629,4 +1060,26 @@ function splitHashtags(value: string): string[] {
     .filter(Boolean)
     .map((item) => `#${item.replace(/^#+/, "")}`)
     .slice(0, 12);
+}
+
+function toLocalDateTime(value: string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function campaignStatusLabel(campaign: MarketingCampaign): string {
+  if (campaign.status === "approved") {
+    const now = Date.now();
+    if (campaign.starts_at && new Date(campaign.starts_at).getTime() > now) {
+      return "Planifiee";
+    }
+    if (campaign.ends_at && new Date(campaign.ends_at).getTime() < now) {
+      return "Terminee";
+    }
+    return "Actif";
+  }
+  if (campaign.status === "draft") return "Brouillon";
+  return "Archive";
 }
