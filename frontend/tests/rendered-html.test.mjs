@@ -137,7 +137,15 @@ test("admin and support can upload multiple product photos and videos", async ()
   }
   assert.match(managerSource, /\/videos\?video_url=/);
   assert.match(managerSource, /Vidéo principale/);
-  assert.match(detailSource, /controls playsInline/);
+  assert.match(
+    detailSource,
+    /src=\{activeUrl\}[\s\S]*autoPlay[\s\S]*muted[\s\S]*loop[\s\S]*playsInline/,
+  );
+  assert.doesNotMatch(detailSource, /src=\{activeUrl\}\s+controls/);
+  assert.match(
+    detailSource,
+    /setSelectedMedia\(item\.videos\?\.\[0\] \|\| item\.images\?\.\[0\]/,
+  );
   assert.match(detailSource, /product-media-thumbnails/);
 });
 

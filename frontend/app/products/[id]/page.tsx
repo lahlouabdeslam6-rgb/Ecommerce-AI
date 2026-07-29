@@ -21,7 +21,7 @@ export default function ProductDetailPage() {
     api<Product>(`/api/products/${params.id}`)
       .then((item) => {
         setProduct(item);
-        setSelectedMedia(item.images?.[0] || item.videos?.[0] || "");
+        setSelectedMedia(item.videos?.[0] || item.images?.[0] || "");
       })
       .catch((requestError: Error) => setError(requestError.message));
   }, [params.id]);
@@ -64,8 +64,8 @@ export default function ProductDetailPage() {
 
   const videos = product.videos || [];
   const media = [
-    ...product.images.map((url) => ({ type: "image" as const, url })),
     ...videos.map((url) => ({ type: "video" as const, url })),
+    ...product.images.map((url) => ({ type: "image" as const, url })),
   ];
   const activeMedia = selectedMedia || media[0]?.url || "";
   const activeIsVideo = videos.includes(activeMedia);
@@ -78,7 +78,15 @@ export default function ProductDetailPage() {
         <div className="product-media-column">
           <div className="detail-visual">
             {activeUrl && activeIsVideo ? (
-              <video src={activeUrl} controls playsInline preload="metadata" />
+              <video
+                src={activeUrl}
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="auto"
+                aria-label={`Vidéo de ${product.name || "ce produit"}`}
+              />
             ) : activeUrl ? (
               <img src={activeUrl} alt={product.image_alt || product.name || "Produit"} />
             ) : (
