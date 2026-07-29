@@ -256,10 +256,10 @@ class MarketingAgentService:
                     status.HTTP_422_UNPROCESSABLE_ENTITY,
                     "A single-product promotion needs exactly one product",
                 )
-            if promotion_kind == "pack" and not 2 <= len(product_ids) <= 4:
+            if promotion_kind == "pack" and len(product_ids) < 2:
                 raise HTTPException(
                     status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    "A pack needs two to four products",
+                    "A pack needs at least two products",
                 )
             suggestion = await PromotionScoringService(self.session).suggest(
                 promotion_kind=promotion_kind,
@@ -319,10 +319,10 @@ class MarketingAgentService:
                 status.HTTP_409_CONFLICT,
                 "Choose exactly one product before activation",
             )
-        if kind == "pack" and not 2 <= len(product_ids) <= 4:
+        if kind == "pack" and len(product_ids) < 2:
             raise HTTPException(
                 status.HTTP_409_CONFLICT,
-                "Choose two to four products before pack activation",
+                "Choose at least two products before pack activation",
             )
         scoring = PromotionScoringService(self.session)
         suggestion = await scoring.suggest(

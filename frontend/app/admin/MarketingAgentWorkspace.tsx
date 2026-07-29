@@ -181,7 +181,7 @@ export function MarketingAgentWorkspace() {
       }
       const selected = current.product_ids.includes(productId)
         ? current.product_ids.filter((item) => item !== productId)
-        : [...current.product_ids, productId].slice(0, 4);
+        : [...current.product_ids, productId];
       return { ...current, product_ids: selected };
     });
     setSuggestion(null);
@@ -494,7 +494,7 @@ export function MarketingAgentWorkspace() {
                       }}
                     >
                       <option value="single_product">Produit unique</option>
-                      <option value="pack">Pack de 2 a 4 produits</option>
+                      <option value="pack">Pack de produits</option>
                     </select>
                   </label>
                   <label>
@@ -559,6 +559,9 @@ export function MarketingAgentWorkspace() {
                       </div>
                       <small className="muted">
                         {form.product_ids.length} produit(s) selectionne(s)
+                        {form.promotion_kind === "pack"
+                          ? " · minimum 2, sans limite maximale"
+                          : ""}
                       </small>
                     </div>
                   )}
@@ -807,8 +810,7 @@ export function MarketingAgentWorkspace() {
                             product_ids: event.target.value
                               .split(/[,\s]+/)
                               .map((item) => Number(item))
-                              .filter((item) => Number.isInteger(item) && item > 0)
-                              .slice(0, 4),
+                              .filter((item) => Number.isInteger(item) && item > 0),
                           })
                         }
                       />

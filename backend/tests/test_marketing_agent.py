@@ -109,7 +109,7 @@ def test_marketing_approval_requires_selected_channel_content() -> None:
     assert "email" in str(error.value.detail)
 
 
-def test_manual_pack_requires_two_to_four_products() -> None:
+def test_manual_pack_requires_at_least_two_products() -> None:
     with pytest.raises(ValueError):
         MarketingGenerateRequest(
             campaign_type="promotion",
@@ -120,6 +120,20 @@ def test_manual_pack_requires_two_to_four_products() -> None:
             selection_mode="manual",
             product_ids=[10],
         )
+
+
+def test_manual_pack_accepts_more_than_four_products() -> None:
+    request = MarketingGenerateRequest(
+        campaign_type="promotion",
+        topic="Pack performance complet",
+        objective="Proposer une offre controlee",
+        channels=["instagram"],
+        promotion_kind="pack",
+        selection_mode="manual",
+        product_ids=[10, 20, 30, 40, 50, 60],
+    )
+
+    assert request.product_ids == [10, 20, 30, 40, 50, 60]
 
 
 def test_promotion_score_uses_sales_stock_and_momentum() -> None:

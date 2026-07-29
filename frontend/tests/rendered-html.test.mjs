@@ -315,7 +315,8 @@ test("admin Marketing Agent keeps campaigns in a controlled approval flow", asyn
   assert.match(marketingSource, /Enregistrer brouillon/);
   assert.match(marketingSource, /Valider la campagne/);
   assert.match(marketingSource, /Produit unique/);
-  assert.match(marketingSource, /Pack de 2 a 4 produits/);
+  assert.match(marketingSource, /Pack de produits/);
+  assert.doesNotMatch(marketingSource, /slice\(0, 4\)/);
   assert.match(marketingSource, /Automatique par Marketing Agent/);
   assert.match(marketingSource, /Manuelle par admin/);
   assert.match(marketingSource, /Proposer les produits avec le score/);

@@ -38,7 +38,7 @@ class PromotionProductScore(BaseModel):
 
 class PromotionSuggestionRequest(BaseModel):
     promotion_kind: PromotionKind
-    product_ids: list[int] = Field(default_factory=list, max_length=4)
+    product_ids: list[int] = Field(default_factory=list)
 
     @field_validator("product_ids")
     @classmethod
@@ -86,7 +86,7 @@ class MarketingGenerateRequest(BaseModel):
     product_id: int | None = Field(default=None, ge=1)
     promotion_kind: PromotionKind | None = None
     selection_mode: PromotionSelectionMode | None = None
-    product_ids: list[int] = Field(default_factory=list, max_length=4)
+    product_ids: list[int] = Field(default_factory=list)
     discount_percentage: float | None = Field(default=None, ge=0, le=50)
     starts_at: datetime | None = None
     ends_at: datetime | None = None
@@ -115,11 +115,15 @@ class MarketingGenerateRequest(BaseModel):
         self.selection_mode = self.selection_mode or "automatic"
         if self.selection_mode == "manual":
             expected_min = 2 if self.promotion_kind == "pack" else 1
-            expected_max = 4 if self.promotion_kind == "pack" else 1
-            if not expected_min <= len(self.product_ids) <= expected_max:
+            valid_count = (
+                len(self.product_ids) >= expected_min
+                if self.promotion_kind == "pack"
+                else len(self.product_ids) == 1
+            )
+            if not valid_count:
                 raise ValueError(
                     "Manual single-product promotions need one product; "
-                    "manual packs need two to four products"
+                    "manual packs need at least two products"
                 )
         if self.starts_at and self.ends_at and self.ends_at <= self.starts_at:
             raise ValueError("Promotion end date must be after start date")
@@ -158,7 +162,7 @@ class MarketingCampaignUpdate(BaseModel):
     recommended_schedule: str | None = Field(default=None, max_length=300)
     promotion_kind: PromotionKind | None = None
     selection_mode: PromotionSelectionMode | None = None
-    product_ids: list[int] | None = Field(default=None, max_length=4)
+    product_ids: list[int] | None = Field(default=None)
     discount_percentage: float | None = Field(default=None, ge=0, le=50)
     starts_at: datetime | None = None
     ends_at: datetime | None = None
