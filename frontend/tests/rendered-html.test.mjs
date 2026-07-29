@@ -454,7 +454,17 @@ test("staff uses merged AI workspaces and human-controlled order verification", 
   assert.match(adminSource, /\["content-seo", "Contenu & SEO"\]/);
   assert.match(adminSource, /\["business-intelligence", "Business Intelligence"\]/);
   assert.match(adminSource, /\["support-delivery", "Support & livraison"\]/);
-  assert.match(supportSource, /Support &amp; livraison/);
+  assert.match(supportSource, />Demandes clients<\/button>/);
+  assert.match(supportSource, />Commandes<\/button>/);
+  assert.match(supportSource, /requestedTab === "orders"/);
+  assert.match(
+    supportSource,
+    /tab === "orders" && <><div className="page-title">/,
+  );
+  assert.match(
+    supportSource,
+    /orders\.items\.map[\s\S]*<OrderVerificationWorkspace \/><DeliveryAgentWorkspace/,
+  );
   assert.match(supportSource, /OrderVerificationWorkspace/);
   assert.match(verificationSource, /\/api\/ai\/order-verification\/report/);
   assert.match(verificationSource, /ne refuse et n&apos;annule jamais/);

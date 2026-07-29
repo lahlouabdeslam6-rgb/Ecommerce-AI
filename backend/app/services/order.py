@@ -237,7 +237,7 @@ class OrderService:
                 notification_type="new_order",
                 title="Nouvelle commande à confirmer",
                 message=confirmation_message,
-                link=f"/support?tab=operations&order={order.id}",
+                link=f"/support?tab=orders&order={order.id}",
             )
             await self.session.flush()
             saved_order = await self.order_repository.get_by_id(
