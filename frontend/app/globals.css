@@ -1206,6 +1206,106 @@ input:disabled { color:#817c75; background:#1b1a1d; }
     position: static;
   }
 }
+
+/* Global overflow safety: content must adapt to its card instead of widening
+   the entire page. Horizontal scrollers keep their own explicit overflow. */
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+}
+main,
+section,
+article,
+form,
+fieldset,
+.panel,
+.admin-shell,
+.admin-content,
+.content-agent-layout,
+.content-agent-left {
+  min-width: 0;
+  max-width: 100%;
+}
+input,
+select,
+textarea {
+  min-width: 0;
+  max-width: 100%;
+}
+.form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.form-grid > *,
+.stats-grid > *,
+.analytics-metrics > *,
+.stock-forecast-metrics > *,
+.delivery-metrics > *,
+.seo-metrics > * {
+  min-width: 0;
+}
+h1,
+h2,
+h3,
+h4,
+h5,
+p,
+label,
+small,
+strong,
+span,
+a,
+button,
+td,
+th {
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+.stat-card strong,
+.analytics-metrics article > strong,
+.stock-forecast-metrics strong,
+.delivery-metrics strong,
+.seo-metrics strong {
+  font-size: clamp(19px, 1.7vw, 26px);
+  line-height: 1.08;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: normal;
+  word-break: normal;
+  white-space: nowrap;
+}
+.marketing-agent-workspace .marketing-review > *,
+.marketing-agent-workspace .marketing-copy-block,
+.marketing-agent-workspace .channel-selector,
+.marketing-agent-workspace .promotion-review-block,
+.marketing-agent-workspace .marketing-review .form-grid > label {
+  min-width: 0;
+  max-width: 100%;
+}
+.marketing-agent-workspace .marketing-review .form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.marketing-agent-workspace .marketing-review input,
+.marketing-agent-workspace .marketing-review select,
+.marketing-agent-workspace .marketing-review textarea {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.marketing-agent-workspace .marketing-review textarea.marketing-short-textarea {
+  min-height: 64px;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+@media (max-width: 760px) {
+  .form-grid,
+  .marketing-agent-workspace .marketing-review .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 @media (max-width:720px) {
   .promotion-product-options { grid-template-columns: 1fr; }
 }

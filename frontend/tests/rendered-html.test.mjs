@@ -301,12 +301,13 @@ test("notifications open their exact order or conversation for every role", asyn
 });
 
 test("admin Marketing Agent keeps campaigns in a controlled approval flow", async () => {
-  const [adminSource, marketingSource] = await Promise.all([
+  const [adminSource, marketingSource, styles] = await Promise.all([
     readFile(new URL("../app/admin/page.tsx", import.meta.url), "utf8"),
     readFile(
       new URL("../app/admin/MarketingAgentWorkspace.tsx", import.meta.url),
       "utf8",
     ),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
   ]);
   assert.match(adminSource, /\["marketing", "Marketing AI"\]/);
   assert.match(adminSource, /MarketingAgentWorkspace/);
@@ -324,6 +325,12 @@ test("admin Marketing Agent keeps campaigns in a controlled approval flow", asyn
   assert.match(marketingSource, /ends_at/);
   assert.match(marketingSource, /taux de conversion/i);
   assert.match(marketingSource, /marge/i);
+  assert.match(marketingSource, /marketing-short-textarea/);
+  assert.match(styles, /overflow-x:\s*clip/);
+  assert.match(
+    styles,
+    /\.marketing-agent-workspace \.marketing-review textarea\.marketing-short-textarea/,
+  );
   assert.match(marketingSource, /Aucun message n'a ete envoye automatiquement/);
   assert.match(
     marketingSource,

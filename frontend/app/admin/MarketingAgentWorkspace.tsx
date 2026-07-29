@@ -901,7 +901,9 @@ export function MarketingAgentWorkspace() {
               </label>
               <label>
                 Nom de campagne
-                <input
+                <textarea
+                  className="marketing-short-textarea"
+                  rows={2}
                   value={selected.campaign_title}
                   onChange={(event) =>
                     updateSelected({ campaign_title: event.target.value })
@@ -910,7 +912,9 @@ export function MarketingAgentWorkspace() {
               </label>
               <label>
                 Accroche
-                <input
+                <textarea
+                  className="marketing-short-textarea"
+                  rows={2}
                   value={selected.headline}
                   onChange={(event) =>
                     updateSelected({ headline: event.target.value })
@@ -931,7 +935,9 @@ export function MarketingAgentWorkspace() {
                   <strong>Email</strong>
                   <label>
                     Objet
-                    <input
+                    <textarea
+                      className="marketing-short-textarea"
+                      rows={2}
                       value={selected.email_subject || ""}
                       onChange={(event) =>
                         updateSelected({
@@ -1009,7 +1015,9 @@ export function MarketingAgentWorkspace() {
               </label>
               <label>
                 Planning recommande
-                <input
+                <textarea
+                  className="marketing-short-textarea"
+                  rows={2}
                   value={selected.recommended_schedule || ""}
                   onChange={(event) =>
                     updateSelected({
