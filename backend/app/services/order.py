@@ -63,7 +63,11 @@ class OrderService:
         tracking_token = secrets.token_urlsafe(32)
         order = await self._checkout_items(
             user_id=None,
-            email=str(data.email),
+            email=(
+                str(data.email)
+                if data.email
+                else f"guest-{tracking_token[:12]}@orders.nutrifit.ma"
+            ),
             data=data,
             requested_items=[
                 (item.product_id, item.quantity) for item in data.items

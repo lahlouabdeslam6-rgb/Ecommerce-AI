@@ -155,7 +155,11 @@ test("checkout exposes COD and card payment without persisting sensitive fields"
   assert.match(checkoutSource, /Paiement a la livraison/);
   assert.match(checkoutSource, /Carte bancaire/);
   assert.match(checkoutSource, /Le compte est facultatif/);
-  assert.match(checkoutSource, /La commande ne sera envoyée/);
+  assert.match(checkoutSource, /L&apos;adresse\s+exacte sera confirmée/);
+  assert.match(checkoutSource, /La commande ne sera\s+envoyée/);
+  assert.doesNotMatch(checkoutSource, /\bEmail\b/);
+  assert.doesNotMatch(checkoutSource, /\bAdresse\b/);
+  assert.doesNotMatch(checkoutSource, /Notes de livraison/);
   assert.match(checkoutSource, /\/api\/orders\/guest-checkout/);
   assert.match(checkoutSource, /saveGuestOrderReceipt/);
   assert.match(checkoutSource, /clearGuestCart\(\)/);

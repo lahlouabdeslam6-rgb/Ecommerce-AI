@@ -7,6 +7,7 @@ from httpx import ASGITransport, AsyncClient
 
 from app.main import app
 from app.models.order import Order
+from app.repositories.order import OrderRepository
 from app.schemas.order import GuestCheckoutResponse, OrderResponse
 from app.services.order import OrderService
 
@@ -66,10 +67,8 @@ async def test_guest_checkout_requires_no_authentication(
         response = await client.post(
             "/api/orders/guest-checkout",
             json={
-                "email": "invite@example.com",
                 "full_name": "Client Invite",
                 "phone": "0612345678",
-                "address": "Adresse livraison 12",
                 "city": "Casablanca",
                 "payment_method": "cash_on_delivery",
                 "items": [{"product_id": 15207, "quantity": 1}],
@@ -79,6 +78,9 @@ async def test_guest_checkout_requires_no_authentication(
     assert response.status_code == 201
     assert response.json()["order"]["user_id"] is None
     assert response.json()["tracking_token"]
+    checkout_data = service_class.return_value.guest_checkout.await_args.args[0]
+    assert checkout_data.email is None
+    assert checkout_data.address is None
 
 
 @pytest.mark.asyncio
@@ -121,3 +123,41 @@ async def test_guest_tracking_rejects_wrong_secret() -> None:
         )
 
     assert error.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_order_uses_phone_confirmation_when_address_is_omitted() -> None:
+    session = MagicMock()
+    session.flush = AsyncMock()
+    repository = OrderRepository(session)
+
+    order = await repository.create(
+        user_id=None,
+        email="guest-test@orders.nutrifit.ma",
+        shipping={
+            "full_name": "Client Invite",
+            "phone": "0612345678",
+            "city": "Kenitra",
+            "address": None,
+            "notes": None,
+        },
+        items=[
+            {
+                "product_id": 15207,
+                "product_name": "Creatine",
+                "brand": "NUTRIFIT",
+                "image_url": None,
+                "unit_price": 200,
+                "quantity": 1,
+                "subtotal": 200,
+            }
+        ],
+        subtotal=200,
+        delivery_fee=0,
+        payment_method="cash_on_delivery",
+        payment_status="pending",
+    )
+
+    assert order.address == "A confirmer par telephone"
+    session.add.assert_called_once_with(order)
+    session.flush.assert_awaited_once()

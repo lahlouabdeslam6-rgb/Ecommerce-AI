@@ -20,11 +20,8 @@ export default function CheckoutPage() {
   const [cart, setCart] = useState<Cart | null>(null);
   const [form, setForm] = useState({
     full_name: "",
-    email: "",
     phone: "",
-    address: "",
     city: "",
-    notes: "",
   });
   const [paymentMethod, setPaymentMethod] =
     useState<PaymentMethod>("cash_on_delivery");
@@ -43,7 +40,6 @@ export default function CheckoutPage() {
       setForm((value) => ({
         ...value,
         full_name: user.full_name || "",
-        email: user.email,
       }));
       void (async () => {
         try {
@@ -78,20 +74,16 @@ export default function CheckoutPage() {
     setError("");
     const delivery = {
       full_name: form.full_name.trim(),
-      email: form.email.trim(),
       phone: form.phone.trim(),
-      address: form.address.trim(),
       city: form.city.trim(),
     };
     if (
       delivery.full_name.length < 2 ||
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(delivery.email) ||
       delivery.phone.replace(/\D/g, "").length < 8 ||
-      delivery.address.length < 5 ||
       delivery.city.length < 2
     ) {
       setError(
-        "Renseignez correctement le nom, l'email, le telephone, la ville et l'adresse.",
+        "Renseignez correctement le nom complet, le telephone et la ville.",
       );
       return;
     }
@@ -119,9 +111,7 @@ export default function CheckoutPage() {
       const shipping = {
         full_name: delivery.full_name,
         phone: delivery.phone,
-        address: delivery.address,
         city: delivery.city,
-        notes: form.notes.trim() || null,
       };
       const payment =
         paymentMethod === "card"
@@ -152,7 +142,6 @@ export default function CheckoutPage() {
             body: JSON.stringify({
               ...shipping,
               ...payment,
-              email: delivery.email,
               items: cart.items.map((item) => ({
                 product_id: item.product_id,
                 quantity: item.quantity,
@@ -186,9 +175,10 @@ export default function CheckoutPage() {
           la commande avant la preparation.
         </p>
         <div className="checkout-required-note">
-          Renseignez vos coordonnées de livraison. La commande ne sera envoyée
-          à l&apos;équipe qu&apos;après avoir cliqué sur « Confirmer la
-          commande ».
+          Renseignez votre nom, votre téléphone et votre ville. L&apos;adresse
+          exacte sera confirmée avec vous par téléphone. La commande ne sera
+          envoyée à l&apos;équipe qu&apos;après avoir cliqué sur « Confirmer
+          la commande ».
         </div>
         <form className="checkout-form" onSubmit={submit}>
           <div className="form-grid">
@@ -199,18 +189,6 @@ export default function CheckoutPage() {
                 onChange={(event) =>
                   setForm({ ...form, full_name: event.target.value })
                 }
-                required
-              />
-            </label>
-            <label>
-              Email
-              <input
-                type="email"
-                value={form.email}
-                onChange={(event) =>
-                  setForm({ ...form, email: event.target.value })
-                }
-                readOnly={!!user}
                 required
               />
             </label>
@@ -233,25 +211,6 @@ export default function CheckoutPage() {
                   setForm({ ...form, city: event.target.value })
                 }
                 required
-              />
-            </label>
-            <label className="full-field">
-              Adresse
-              <input
-                value={form.address}
-                onChange={(event) =>
-                  setForm({ ...form, address: event.target.value })
-                }
-                required
-              />
-            </label>
-            <label className="full-field">
-              Notes de livraison
-              <textarea
-                value={form.notes}
-                onChange={(event) =>
-                  setForm({ ...form, notes: event.target.value })
-                }
               />
             </label>
           </div>

@@ -33,7 +33,7 @@ class OrderRepository:
             guest_token_hash=guest_token_hash,
             full_name=str(shipping["full_name"]),
             phone=str(shipping["phone"]),
-            address=str(shipping["address"]),
+            address=str(shipping.get("address") or "A confirmer par telephone"),
             city=str(shipping["city"]),
             notes=shipping.get("notes"),
             subtotal=subtotal,

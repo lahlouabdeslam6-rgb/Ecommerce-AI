@@ -6,8 +6,8 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 class CheckoutRequest(BaseModel):
     full_name: str = Field(min_length=2, max_length=120)
     phone: str = Field(min_length=8, max_length=30)
-    address: str = Field(min_length=5, max_length=500)
     city: str = Field(min_length=2, max_length=120)
+    address: str | None = Field(default=None, min_length=5, max_length=500)
     notes: str | None = Field(default=None, max_length=1000)
     payment_method: str = Field(default="cash_on_delivery", pattern=r"^(cash_on_delivery|card)$")
     card_last4: str | None = Field(default=None, pattern=r"^\d{4}$")
@@ -21,7 +21,7 @@ class GuestCartItemInput(BaseModel):
 
 
 class GuestCheckoutRequest(CheckoutRequest):
-    email: EmailStr
+    email: EmailStr | None = None
     items: list[GuestCartItemInput] = Field(min_length=1, max_length=50)
 
 
