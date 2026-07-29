@@ -234,9 +234,11 @@ test("published promotions filter the matching catalogue segment", async () => {
   assert.match(source, /cleanPublishedText/);
 });
 
-test("admin has a client message inbox and role-aware notification links", async () => {
-  const [adminSource, inboxSource, bellSource] = await Promise.all([
+test("notifications open their exact order or conversation for every role", async () => {
+  const [adminSource, supportSource, ordersSource, inboxSource, bellSource] = await Promise.all([
     readFile(new URL("../app/admin/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/support/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/orders/page.tsx", import.meta.url), "utf8"),
     readFile(
       new URL("../app/admin/AdminTicketWorkspace.tsx", import.meta.url),
       "utf8",
@@ -249,9 +251,19 @@ test("admin has a client message inbox and role-aware notification links", async
   assert.match(adminSource, /\["support-delivery", "Support & livraison"\]/);
   assert.match(adminSource, /AdminTicketWorkspace/);
   assert.match(inboxSource, /\/api\/support\/tickets\?page_size=100/);
+  assert.match(inboxSource, /\/api\/support\/tickets\/\$\{initialTicketId\}/);
   assert.match(inboxSource, /Reponse admin envoyee au client/);
   assert.match(inboxSource, /\/messages/);
+  assert.match(adminSource, /requestedTab === "support-delivery"/);
+  assert.match(adminSource, /admin-order-\$\{order\.id\}/);
+  assert.match(supportSource, /support-order-\$\{order\.id\}/);
+  assert.match(ordersSource, /customer-order-\$\{order\.id\}/);
   assert.match(bellSource, /\/admin\?tab=support-delivery&ticket=/);
+  assert.match(bellSource, /\/support\?tab=operations&ticket=/);
+  assert.match(bellSource, /\/admin\?tab=orders&order=/);
+  assert.match(bellSource, /\/support\?tab=orders&order=/);
+  assert.match(bellSource, /\/orders\?order=/);
+  assert.doesNotMatch(bellSource, /return link \? \(/);
 });
 
 test("admin Marketing Agent keeps campaigns in a controlled approval flow", async () => {

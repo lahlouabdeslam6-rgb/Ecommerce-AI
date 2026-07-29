@@ -26,10 +26,26 @@ export default function HelpPage() {
 
   const load = async () => {
     try {
-      const [ticketData, orderData] = await Promise.all([
+      const [loadedTickets, orderData] = await Promise.all([
         api<TicketList>("/api/tickets", {}, true),
         api<PaginatedOrders>("/api/orders?page_size=50", {}, true),
       ]);
+      let ticketData = loadedTickets;
+      if (
+        Number.isInteger(requestedTicketId) &&
+        requestedTicketId > 0 &&
+        !loadedTickets.items.some((item) => item.id === requestedTicketId)
+      ) {
+        const requestedTicket = await api<SupportTicket>(
+          `/api/tickets/${requestedTicketId}`,
+          {},
+          true,
+        );
+        ticketData = {
+          ...loadedTickets,
+          items: [requestedTicket, ...loadedTickets.items],
+        };
+      }
       setTickets(ticketData);
       setOrders(orderData);
       const ticketToSelect = requestedTicketId || selected?.id;
@@ -43,7 +59,7 @@ export default function HelpPage() {
     }
   };
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); }, [requestedTicketId]);
 
   const createTicket = async (event: FormEvent) => {
     event.preventDefault();

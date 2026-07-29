@@ -26,11 +26,22 @@ export function AdminTicketWorkspace({
 
   const load = async () => {
     try {
-      const result = await api<TicketList>(
+      let result = await api<TicketList>(
         "/api/support/tickets?page_size=100",
         {},
         true,
       );
+      if (
+        initialTicketId &&
+        !result.items.some((ticket) => ticket.id === initialTicketId)
+      ) {
+        const requestedTicket = await api<SupportTicket>(
+          `/api/support/tickets/${initialTicketId}`,
+          {},
+          true,
+        );
+        result = { ...result, items: [requestedTicket, ...result.items] };
+      }
       setTickets(result);
       setSelectedId((current) => {
         if (
@@ -48,7 +59,7 @@ export function AdminTicketWorkspace({
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [initialTicketId]);
 
   useEffect(() => {
     if (initialTicketId) setSelectedId(initialTicketId);

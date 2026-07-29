@@ -242,6 +242,7 @@ input:disabled { color:#817c75; background:#1b1a1d; }
 .notification-menu .unread { background:#211c14; }
 .notification-menu b { color:#e0c17b; }
 .notification-menu span { font-size:12px; line-height:1.4; }
+.notification-target { position:relative; z-index:1; outline:2px solid var(--amber); outline-offset:-2px; box-shadow:0 0 0 5px rgba(212,177,106,.14),0 14px 36px rgba(0,0,0,.28); }
 .email-state { display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .product-image-manager { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; margin-top:10px; }
 .product-image-manager article { overflow:hidden; border:1px solid #39363a; border-radius:8px; background:#111113; }

@@ -174,9 +174,9 @@ class DeliveryAgentService:
                     title=title,
                     message=item.reason,
                     link=(
-                        f"/support?order={item.order_id}"
+                        f"/support?tab=orders&order={item.order_id}"
                         if role == "support"
-                        else f"/admin?tab=support-delivery&order={item.order_id}"
+                        else f"/admin?tab=orders&order={item.order_id}"
                     ),
                 )
             self.operations.add_audit(

@@ -17,7 +17,7 @@ import { SEOAgentWorkspace } from "./SEOAgentWorkspace";
 import { StockForecastWorkspace } from "./StockForecastWorkspace";
 import { OrderVerificationWorkspace } from "../components/OrderVerificationWorkspace";
 import { api, money } from "../lib/api";
-import type { PaginatedOrders, Product, ProductList, User } from "../types";
+import type { Order, PaginatedOrders, Product, ProductList, User } from "../types";
 
 type Dashboard = { users: number; products: number; active_products: number; low_stock_products: number; orders: number; pending_orders: number; delivered_orders: number; revenue_mad: number };
 type UserList = { items: User[]; total: number; page: number; page_size: number; total_pages: number };
@@ -38,6 +38,7 @@ export default function AdminPage() {
   const productToEdit = searchParams.get("product");
   const requestedTab = searchParams.get("tab");
   const requestedTicketId = Number(searchParams.get("ticket"));
+  const requestedOrderId = Number(searchParams.get("order"));
   const { user } = useAuth();
   const [tab, setTab] = useState("dashboard");
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
@@ -88,14 +89,27 @@ export default function AdminPage() {
         api<UserList>("/api/admin/support-users?page_size=100", {}, true),
         api<AuditLogList>("/api/admin/audit-logs?page_size=100", {}, true),
       ]);
-      setDashboard(d); setProducts(p); setOrders(o); setUsers(u); setSupportUsers(s); setAuditLogs(a);
+      let orderData = o;
+      if (
+        Number.isInteger(requestedOrderId) &&
+        requestedOrderId > 0 &&
+        !o.items.some((item) => item.id === requestedOrderId)
+      ) {
+        const requestedOrder = await api<Order>(
+          `/api/admin/orders/${requestedOrderId}`,
+          {},
+          true,
+        );
+        orderData = { ...o, items: [requestedOrder, ...o.items] };
+      }
+      setDashboard(d); setProducts(p); setOrders(orderData); setUsers(u); setSupportUsers(s); setAuditLogs(a);
     } catch (err) { setError((err as Error).message); }
   };
 
-  useEffect(() => { void load(); }, [user]);
+  useEffect(() => { void load(); }, [user, requestedOrderId]);
 
   useEffect(() => {
-    if (requestedTab === "messages" || requestedTab === "delivery") {
+    if (requestedTab === "support-delivery" || requestedTab === "messages" || requestedTab === "delivery") {
       setTab("support-delivery");
     } else if (requestedTab === "analytics" || requestedTab === "stock-forecast") {
       setTab("business-intelligence");
@@ -105,6 +119,20 @@ export default function AdminPage() {
       setTab("orders");
     }
   }, [requestedTab]);
+
+  useEffect(() => {
+    if (
+      tab !== "orders" ||
+      !Number.isInteger(requestedOrderId) ||
+      requestedOrderId < 1 ||
+      !orders?.items.some((item) => item.id === requestedOrderId)
+    ) return;
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById(`admin-order-${requestedOrderId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, [orders, requestedOrderId, tab]);
 
   useEffect(() => {
     const productId = Number(productToEdit);
@@ -369,7 +397,7 @@ export default function AdminPage() {
 
     {tab === "safety" && <SafetyAgentWorkspace />}
 
-    {tab === "orders" && <><Title kicker="Operations" title="Commandes" />{!orders?.items.length ? <div className="empty-state"><h3>Aucune commande</h3></div> : <div className="data-table orders-table"><div className="table-row table-head"><span>No</span><span>Client</span><span>Total</span><span>Paiement</span><span>Statut</span></div>{orders.items.map((order) => <div className="table-row" key={order.id}><span>#{order.id}</span><span><strong>{order.full_name}</strong><small>{order.city} - {order.phone}</small></span><span>{money(order.total)}</span><span>{order.payment_status}</span><span><select value={order.order_status} onChange={(e) => updateOrder(order.id, e.target.value)}>{orderStatuses.map((status) => <option key={status}>{status}</option>)}</select></span></div>)}</div>}</>}
+    {tab === "orders" && <><Title kicker="Operations" title="Commandes" />{!orders?.items.length ? <div className="empty-state"><h3>Aucune commande</h3></div> : <div className="data-table orders-table"><div className="table-row table-head"><span>No</span><span>Client</span><span>Total</span><span>Paiement</span><span>Statut</span></div>{orders.items.map((order) => <div id={`admin-order-${order.id}`} className={`table-row ${requestedOrderId === order.id ? "notification-target" : ""}`} key={order.id}><span>#{order.id}</span><span><strong>{order.full_name}</strong><small>{order.city} - {order.phone}</small></span><span>{money(order.total)}</span><span>{order.payment_status}</span><span><select value={order.order_status} onChange={(e) => updateOrder(order.id, e.target.value)}>{orderStatuses.map((status) => <option key={status}>{status}</option>)}</select></span></div>)}</div>}</>}
 
     {tab === "support-users" && <><Title kicker="Acces support" title="Equipe support" action={<button className="button button-small" onClick={newSupport}>Ajouter un support</button>} />{!supportUsers?.items.length ? <div className="empty-state"><h3>Aucun compte support</h3><button className="button" onClick={newSupport}>Creer le premier compte</button></div> : <div className="support-account-grid">{supportUsers.items.map((item) => <article className="support-account-card" key={item.id}><div className="support-avatar">{(item.full_name || item.email).slice(0, 2).toUpperCase()}</div><div><strong>{item.full_name || "Support"}</strong><small>{item.email}</small><span className={`account-state ${item.is_active ? "active" : ""}`}>{item.is_active ? "Actif" : "Desactive"}</span></div><div className="support-account-actions"><button className="text-link" onClick={() => editSupport(item)}>Modifier</button><button className={`status-toggle ${item.is_active ? "on" : ""}`} onClick={() => updateStatus(item.id, !item.is_active)}>{item.is_active ? "Desactiver" : "Activer"}</button></div></article>)}</div>}</>}
 

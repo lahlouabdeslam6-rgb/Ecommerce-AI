@@ -24,6 +24,7 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<PaginatedOrders | null>(null);
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const requestedOrderId = Number(search.get("order"));
 
   const load = async () => {
     if (loading) return;
@@ -77,6 +78,19 @@ export default function OrdersPage() {
   useEffect(() => {
     void load();
   }, [loading, user]);
+
+  useEffect(() => {
+    if (
+      !Number.isInteger(requestedOrderId) ||
+      requestedOrderId < 1 ||
+      !orders?.items.some((item) => item.id === requestedOrderId)
+    ) return;
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById(`customer-order-${requestedOrderId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, [orders, requestedOrderId]);
 
   const cancel = async (id: number) => {
     if (!user || !window.confirm("Annuler cette commande ?")) return;
@@ -141,7 +155,11 @@ export default function OrdersPage() {
       ) : (
         <div className="orders-list">
           {orders.items.map((order) => (
-            <article className="order-card" key={order.id}>
+            <article
+              id={`customer-order-${order.id}`}
+              className={`order-card ${requestedOrderId === order.id ? "notification-target" : ""}`}
+              key={order.id}
+            >
               <div className="order-card-head">
                 <div>
                   <p className="eyebrow">Commande #{order.id}</p>

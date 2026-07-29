@@ -230,7 +230,7 @@ class OrderService:
                 notification_type="new_order",
                 title="Nouvelle commande à confirmer",
                 message=f"{confirmation_message} ({order.total} MAD)",
-                link=f"/admin?tab=support-delivery&order={order.id}",
+                link=f"/admin?tab=orders&order={order.id}",
             )
             self.operations.add_notification(
                 target_role="support",
@@ -307,7 +307,7 @@ class OrderService:
             notification_type="order_cancelled",
             title="Commande annulee",
             message=f"Le client a annule la commande #{order.id}",
-            link=f"/admin?tab=support-delivery&order={order.id}",
+            link=f"/admin?tab=orders&order={order.id}",
         )
         updated = await self.order_repository.update_status(order, "cancelled")
         return OrderResponse.model_validate(updated)

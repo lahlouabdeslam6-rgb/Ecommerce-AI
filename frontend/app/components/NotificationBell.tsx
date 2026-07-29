@@ -7,6 +7,7 @@ import { api } from "../lib/api";
 
 type Notification = {
   id: number;
+  notification_type: string;
   title: string;
   message: string;
   link: string | null;
@@ -48,15 +49,34 @@ export function NotificationBell() {
   };
 
   const notificationLink = (item: Notification) => {
-    if (
-      user?.role === "admin" &&
-      item.link?.includes("ticket=") &&
-      item.link.startsWith("/support")
-    ) {
-      const ticketId = new URLSearchParams(item.link.split("?")[1]).get("ticket");
-      return `/admin?tab=support-delivery&ticket=${ticketId}`;
+    const parameters = new URLSearchParams(item.link?.split("?")[1] || "");
+    const orderId = parameters.get("order");
+    const ticketId = parameters.get("ticket");
+
+    if (orderId) {
+      if (user?.role === "admin") {
+        return `/admin?tab=orders&order=${orderId}`;
+      }
+      if (user?.role === "support") {
+        return `/support?tab=orders&order=${orderId}`;
+      }
+      return `/orders?order=${orderId}`;
     }
-    return item.link;
+
+    if (ticketId) {
+      if (user?.role === "admin") {
+        return `/admin?tab=support-delivery&ticket=${ticketId}`;
+      }
+      if (user?.role === "support") {
+        return `/support?tab=operations&ticket=${ticketId}`;
+      }
+      return `/help?ticket=${ticketId}`;
+    }
+
+    if (item.link) return item.link;
+    if (user?.role === "admin") return "/admin";
+    if (user?.role === "support") return "/support";
+    return "/account";
   };
 
   return (
@@ -97,24 +117,15 @@ export function NotificationBell() {
           ) : (
             items.slice(0, 8).map((item) => {
               const link = notificationLink(item);
-              return link ? (
+              return (
                 <Link
                   href={link}
                   key={item.id}
                   className={item.is_read ? "" : "unread"}
-                  onClick={() => markRead(item)}
+                  onClick={() => void markRead(item)}
                 >
                   <b>{item.title}</b><span>{item.message}</span>
                 </Link>
-              ) : (
-                <button
-                  type="button"
-                  key={item.id}
-                  className={item.is_read ? "" : "unread"}
-                  onClick={() => markRead(item)}
-                >
-                  <b>{item.title}</b><span>{item.message}</span>
-                </button>
               );
             })
           )}

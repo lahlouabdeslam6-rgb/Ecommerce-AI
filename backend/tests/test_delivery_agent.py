@@ -106,6 +106,13 @@ async def test_delivery_scan_notifies_each_priority_order_once() -> None:
 
     assert report.summary.alerts_sent == 2
     assert operations.add_notification.call_count == 6
+    staff_links = {
+        call.kwargs["link"]
+        for call in operations.add_notification.call_args_list
+        if call.kwargs.get("target_role") in {"admin", "support"}
+    }
+    assert "/admin?tab=orders&order=3" in staff_links
+    assert "/support?tab=orders&order=3" in staff_links
     assert operations.add_audit.call_count == 2
     assert automation.add_outbox.call_count == 4
     session.commit.assert_awaited_once()
