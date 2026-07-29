@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../components/AuthProvider";
 import { api, money } from "../lib/api";
 import { clearGuestCart, getGuestCart } from "../lib/guest-cart";
+import { saveGuestOrderReceipt } from "../lib/guest-orders";
 import type {
   Cart,
   GuestCheckoutResponse,
@@ -34,7 +34,6 @@ export default function CheckoutPage() {
     expiry: "",
     cvv: "",
   });
-  const [guestOrder, setGuestOrder] = useState<Order | null>(null);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -72,27 +71,30 @@ export default function CheckoutPage() {
     }
 
     setCart(getGuestCart());
-    const stored = window.localStorage.getItem("nutrifit_guest_order");
-    if (!stored) return;
-    try {
-      const receipt = JSON.parse(stored) as {
-        order_id: number;
-        tracking_token: string;
-      };
-      api<Order>("/api/orders/guest-track", {
-        method: "POST",
-        body: JSON.stringify(receipt),
-      })
-        .then(setGuestOrder)
-        .catch(() => window.localStorage.removeItem("nutrifit_guest_order"));
-    } catch {
-      window.localStorage.removeItem("nutrifit_guest_order");
-    }
   }, [loading, user]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setError("");
+    const delivery = {
+      full_name: form.full_name.trim(),
+      email: form.email.trim(),
+      phone: form.phone.trim(),
+      address: form.address.trim(),
+      city: form.city.trim(),
+    };
+    if (
+      delivery.full_name.length < 2 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(delivery.email) ||
+      delivery.phone.replace(/\D/g, "").length < 8 ||
+      delivery.address.length < 5 ||
+      delivery.city.length < 2
+    ) {
+      setError(
+        "Renseignez correctement le nom, l'email, le telephone, la ville et l'adresse.",
+      );
+      return;
+    }
     const digits = card.number.replace(/\D/g, "");
     if (paymentMethod === "card") {
       if (
@@ -115,11 +117,11 @@ export default function CheckoutPage() {
     setSubmitting(true);
     try {
       const shipping = {
-        full_name: form.full_name,
-        phone: form.phone,
-        address: form.address,
-        city: form.city,
-        notes: form.notes,
+        full_name: delivery.full_name,
+        phone: delivery.phone,
+        address: delivery.address,
+        city: delivery.city,
+        notes: form.notes.trim() || null,
       };
       const payment =
         paymentMethod === "card"
@@ -150,7 +152,7 @@ export default function CheckoutPage() {
             body: JSON.stringify({
               ...shipping,
               ...payment,
-              email: form.email,
+              email: delivery.email,
               items: cart.items.map((item) => ({
                 product_id: item.product_id,
                 quantity: item.quantity,
@@ -158,17 +160,14 @@ export default function CheckoutPage() {
             }),
           },
         );
-        window.localStorage.setItem(
-          "nutrifit_guest_order",
-          JSON.stringify({
-            order_id: result.order.id,
-            tracking_token: result.tracking_token,
-          }),
-        );
+        saveGuestOrderReceipt({
+          order_id: result.order.id,
+          tracking_token: result.tracking_token,
+        });
         clearGuestCart();
         setCart(getGuestCart());
-        setGuestOrder(result.order);
         setCard({ holder: "", number: "", expiry: "", cvv: "" });
+        router.push(`/orders?created=${result.order.id}`);
       }
     } catch (requestError) {
       setError((requestError as Error).message);
@@ -176,42 +175,6 @@ export default function CheckoutPage() {
       setSubmitting(false);
     }
   };
-
-  if (guestOrder) {
-    return (
-      <section className="shell page-section">
-        <div className="panel guest-order-success">
-          <p className="kicker">Commande enregistree</p>
-          <h1>Commande #{guestOrder.id}</h1>
-          <div className="alert alert-success">
-            Votre commande est en attente de confirmation. Notre equipe admin
-            ou support va vous appeler au {guestOrder.phone}.
-          </div>
-          <p>
-            Les informations de livraison ont ete transmises a l&apos;equipe
-            et au Delivery Agent pour le suivi.
-          </p>
-          <div className="order-summary">
-            <div>
-              <span>Ville</span>
-              <strong>{guestOrder.city}</strong>
-            </div>
-            <div>
-              <span>Total</span>
-              <strong>{money(guestOrder.total, guestOrder.currency)}</strong>
-            </div>
-            <div>
-              <span>Statut</span>
-              <strong>En attente de confirmation</strong>
-            </div>
-          </div>
-          <Link href="/" className="button">
-            Continuer mes achats
-          </Link>
-        </div>
-      </section>
-    );
-  }
 
   return (
     <section className="shell page-section checkout-page">
@@ -222,6 +185,11 @@ export default function CheckoutPage() {
           Le compte est facultatif. Notre equipe vous appellera pour confirmer
           la commande avant la preparation.
         </p>
+        <div className="checkout-required-note">
+          Renseignez vos coordonnées de livraison. La commande ne sera envoyée
+          à l&apos;équipe qu&apos;après avoir cliqué sur « Confirmer la
+          commande ».
+        </div>
         <form className="checkout-form" onSubmit={submit}>
           <div className="form-grid">
             <label>

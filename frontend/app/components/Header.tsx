@@ -10,7 +10,7 @@ export function Header() {
   const router = useRouter();
   const { user, loading, logout } = useAuth();
   const links = !user
-    ? [["/", "Produits"], ["/cart", "Panier"]]
+    ? [["/", "Produits"], ["/cart", "Panier"], ["/orders", "Commandes"]]
     : user.role === "support"
       ? [["/", "Produits"], ["/support", "Espace support"], ["/account", "Compte"]]
       : user.role === "admin"

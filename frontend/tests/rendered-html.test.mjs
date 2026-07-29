@@ -38,7 +38,7 @@ test("server-renders the NUTRIFIT premium homepage", async () => {
   assert.match(html, /href="\/register"/);
   assert.match(html, /header-actions guest-actions/);
   assert.match(html, /href="\/cart"/);
-  assert.doesNotMatch(html, /href="\/orders"/);
+  assert.match(html, /href="\/orders"/);
   assert.doesNotMatch(html, /href="\/help"/);
   assert.doesNotMatch(html, /href="\/account"/);
   assert.match(html, /\/nutrifit-hero\.png/);
@@ -144,21 +144,35 @@ test("checkout exposes COD and card payment without persisting sensitive fields"
   assert.match(html, /NUTRIFIT \| Nutrition &amp; Performance/);
   assert.doesNotMatch(html, /Chargement de votre espace/);
 
-  const checkoutSource = await readFile(
-    new URL("../app/checkout/page.tsx", import.meta.url),
-    "utf8",
-  );
+  const [checkoutSource, ordersSource, guestOrdersSource, headerSource] =
+    await Promise.all([
+      readFile(new URL("../app/checkout/page.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/orders/page.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../app/lib/guest-orders.ts", import.meta.url), "utf8"),
+      readFile(new URL("../app/components/Header.tsx", import.meta.url), "utf8"),
+    ]);
   assert.match(checkoutSource, /Livraison & paiement/);
   assert.match(checkoutSource, /Paiement a la livraison/);
   assert.match(checkoutSource, /Carte bancaire/);
   assert.match(checkoutSource, /Le compte est facultatif/);
+  assert.match(checkoutSource, /La commande ne sera envoyée/);
   assert.match(checkoutSource, /\/api\/orders\/guest-checkout/);
-  assert.match(checkoutSource, /\/api\/orders\/guest-track/);
-  assert.match(checkoutSource, /va vous appeler/);
+  assert.match(checkoutSource, /saveGuestOrderReceipt/);
+  assert.match(checkoutSource, /clearGuestCart\(\)/);
+  assert.match(checkoutSource, /router\.push\(`\/orders\?created=/);
+  assert.doesNotMatch(checkoutSource, /setGuestOrder/);
   assert.match(checkoutSource, /aucun debit reel/i);
   assert.match(checkoutSource, /card_last4/);
   assert.match(checkoutSource, /payment_token/);
   assert.doesNotMatch(checkoutSource, /card_number\s*:/);
+  assert.match(ordersSource, /\/api\/orders\/guest-track/);
+  assert.match(ordersSource, /getGuestOrderReceipts/);
+  assert.match(ordersSource, /Suivi sans compte/);
+  assert.match(ordersSource, /Votre panier a été\s+vidé/);
+  assert.doesNotMatch(ordersSource, /<Protected/);
+  assert.match(guestOrdersSource, /nutrifit_guest_orders/);
+  assert.match(guestOrdersSource, /nutrifit_guest_order/);
+  assert.match(headerSource, /\["\/orders", "Commandes"\]/);
 });
 
 test("admin exposes the complete audit history workspace", async () => {
