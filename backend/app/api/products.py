@@ -1,3 +1,4 @@
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Annotated
 from uuid import uuid4
@@ -18,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import require_roles
 from app.db.sqlite import get_sqlite_session
 from app.models.user import User
+from app.repositories.analytics import AnalyticsRepository
 from app.repositories.operations import OperationsRepository
 from app.schemas.product import (
     ProductCreate,
@@ -130,6 +132,38 @@ async def create_product(
 @router.get("/filters", response_model=dict[str, list[str]])
 async def catalog_filters() -> dict[str, list[str]]:
     return await product_service.catalog_filters()
+
+
+@router.get("/best-sellers", response_model=list[ProductResponse])
+async def best_sellers(
+    session: Annotated[AsyncSession, Depends(get_sqlite_session)],
+    limit: Annotated[int, Query(ge=4, le=20)] = 10,
+) -> list[ProductResponse]:
+    end = datetime.now(UTC)
+    sales = await AnalyticsRepository(session).top_products(
+        end - timedelta(days=3650),
+        end,
+        limit=limit,
+    )
+    products = await product_service.get_products(
+        [int(item["product_id"]) for item in sales]
+    )
+    if products:
+        return products
+    fallback = await product_service.list_products(
+        page=1,
+        page_size=limit,
+        search=None,
+        brand=None,
+        ingredient=None,
+        category=None,
+        flavor=None,
+        min_price=None,
+        max_price=None,
+        in_stock=True,
+        sort_by="stock_desc",
+    )
+    return fallback.items
 
 
 @router.get("/manage", response_model=ProductListResponse)

@@ -53,6 +53,7 @@ export function ProductCard({ product }: { product: Product }) {
       } else {
         addGuestProduct(product, 1);
       }
+      window.dispatchEvent(new CustomEvent("cart-changed"));
       window.dispatchEvent(new CustomEvent("toast", { detail: "Produit ajouté au panier" }));
     } catch (error) {
       window.dispatchEvent(

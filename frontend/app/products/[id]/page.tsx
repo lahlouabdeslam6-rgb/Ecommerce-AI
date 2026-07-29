@@ -43,6 +43,7 @@ export default function ProductDetailPage() {
       } else if (product) {
         addGuestProduct(product, quantity);
       }
+      window.dispatchEvent(new CustomEvent("cart-changed"));
       router.push("/cart");
     } catch (requestError) {
       setError((requestError as Error).message);

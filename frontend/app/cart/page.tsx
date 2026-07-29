@@ -18,9 +18,14 @@ export default function CartPage() {
   const [cart, setCart] = useState<Cart | null>(null);
   const [error, setError] = useState("");
 
+  const publishCart = (nextCart: Cart) => {
+    setCart(nextCart);
+    window.dispatchEvent(new CustomEvent("cart-changed"));
+  };
+
   const load = async () => {
     if (!user) {
-      setCart(getGuestCart());
+      publishCart(getGuestCart());
       return;
     }
     try {
@@ -39,7 +44,7 @@ export default function CartPage() {
         );
       }
       if (guestCart.items.length) clearGuestCart();
-      setCart(await api<Cart>("/api/cart", {}, true));
+      publishCart(await api<Cart>("/api/cart", {}, true));
     } catch (requestError) {
       setError((requestError as Error).message);
     }
@@ -52,10 +57,10 @@ export default function CartPage() {
   const update = async (productId: number, quantity: number) => {
     try {
       if (!user) {
-        setCart(updateGuestQuantity(productId, quantity));
+        publishCart(updateGuestQuantity(productId, quantity));
         return;
       }
-      setCart(
+      publishCart(
         await api<Cart>(
           `/api/cart/items/${productId}`,
           {
@@ -73,10 +78,10 @@ export default function CartPage() {
   const remove = async (productId: number) => {
     try {
       if (!user) {
-        setCart(removeGuestProduct(productId));
+        publishCart(removeGuestProduct(productId));
         return;
       }
-      setCart(
+      publishCart(
         await api<Cart>(
           `/api/cart/items/${productId}`,
           { method: "DELETE" },

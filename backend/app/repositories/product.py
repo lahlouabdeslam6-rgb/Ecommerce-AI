@@ -144,6 +144,22 @@ class ProductRepository:
             {"_id": 0},
         )
 
+    async def get_by_product_ids(
+        self,
+        product_ids: list[int],
+    ) -> list[dict[str, Any]]:
+        if not product_ids:
+            return []
+        rows = await self.collection.find(
+            {
+                "product_id": {"$in": product_ids},
+                "is_active": True,
+            },
+            {"_id": 0},
+        ).to_list(length=len(product_ids))
+        by_id = {int(row["product_id"]): row for row in rows}
+        return [by_id[product_id] for product_id in product_ids if product_id in by_id]
+
     async def create_product(self, data: dict[str, Any]) -> dict[str, Any]:
         now = datetime.now(UTC)
         product = {

@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
-import { ProductCard } from "./components/ProductCard";
+import { ProductRail } from "./components/ProductRail";
 import { SiteFooter } from "./components/SiteFooter";
 import { api } from "./lib/api";
-import type { ProductList } from "./types";
+import type { Product, ProductList } from "./types";
 
 type PublishedContent = {
   id: number;
@@ -54,8 +55,38 @@ function cleanPublishedText(value: string): string {
     .trim();
 }
 
+function promotionCriteria(
+  promotion: PublishedContent,
+  filters: { brands: string[]; categories: string[]; flavors: string[] },
+) {
+  const promotionText = normalizeText([
+    promotion.topic,
+    promotion.title,
+    promotion.subtitle || "",
+    promotion.body,
+    ...(promotion.hashtags || []),
+  ].join(" "));
+  const category = filters.categories.find((item) =>
+    promotionText.includes(normalizeText(item)),
+  );
+  const brand = filters.brands.find((item) =>
+    promotionText.includes(normalizeText(item)),
+  );
+  const flavor = filters.flavors.find((item) =>
+    promotionText.includes(normalizeText(item)),
+  );
+  const search = PROMOTION_SEARCH_TERMS.find((term) =>
+    promotionText.includes(term),
+  ) || promotion.topic;
+  return { category, brand, flavor, search };
+}
+
 export default function Home() {
+  const searchParams = useSearchParams();
+  const requestedSearch = searchParams.get("search") || "";
   const [products, setProducts] = useState<ProductList | null>(null);
+  const [bestSellers, setBestSellers] = useState<Product[]>([]);
+  const [promotionProducts, setPromotionProducts] = useState<Product[]>([]);
   const [filters, setFilters] = useState<{ brands: string[]; categories: string[]; flavors: string[] }>({ brands: [], categories: [], flavors: [] });
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
@@ -71,7 +102,7 @@ export default function Home() {
   const [promotion, setPromotion] = useState<PublishedContent | null>(null);
 
   const query = useMemo(() => {
-    const params = new URLSearchParams({ page: String(page), page_size: "12" });
+    const params = new URLSearchParams({ page: String(page), page_size: "16" });
     if (search.trim()) params.set("search", search.trim());
     if (category) params.set("category", category);
     if (brand) params.set("brand", brand);
@@ -97,35 +128,17 @@ export default function Home() {
 
   const applyPromotionFilter = () => {
     if (!promotion) return;
-    const promotionText = normalizeText([
-      promotion.topic,
-      promotion.title,
-      promotion.subtitle || "",
-      promotion.body,
-      ...(promotion.hashtags || []),
-    ].join(" "));
-    const mentionedCategory = filters.categories.find((item) =>
-      promotionText.includes(normalizeText(item)),
-    );
-    const mentionedBrand = filters.brands.find((item) =>
-      promotionText.includes(normalizeText(item)),
-    );
-    const mentionedFlavor = filters.flavors.find((item) =>
-      promotionText.includes(normalizeText(item)),
-    );
+    const criteria = promotionCriteria(promotion, filters);
 
     resetFilters();
-    if (mentionedCategory) {
-      setCategory(mentionedCategory);
-    } else if (mentionedBrand) {
-      setBrand(mentionedBrand);
-    } else if (mentionedFlavor) {
-      setFlavor(mentionedFlavor);
+    if (criteria.category) {
+      setCategory(criteria.category);
+    } else if (criteria.brand) {
+      setBrand(criteria.brand);
+    } else if (criteria.flavor) {
+      setFlavor(criteria.flavor);
     } else {
-      const searchTerm = PROMOTION_SEARCH_TERMS.find((term) =>
-        promotionText.includes(term),
-      );
-      setSearch(searchTerm || promotion.topic);
+      setSearch(criteria.search);
     }
     window.requestAnimationFrame(() => {
       document.getElementById("catalogue")?.scrollIntoView({
@@ -137,9 +150,36 @@ export default function Home() {
 
   useEffect(() => {
     api<{ brands: string[]; categories: string[]; flavors: string[] }>("/api/products/filters").then(setFilters).catch(() => undefined);
+    api<Product[]>("/api/products/best-sellers?limit=12").then(setBestSellers).catch(() => undefined);
     api<PublishedContent | null>("/api/content/published?content_type=homepage_hero").then(setHeroContent).catch(() => undefined);
     api<PublishedContent | null>("/api/content/published?content_type=promotion").then(setPromotion).catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    setSearch(requestedSearch);
+    setPage(1);
+  }, [requestedSearch]);
+
+  useEffect(() => {
+    if (!promotion) {
+      setPromotionProducts([]);
+      return;
+    }
+    const criteria = promotionCriteria(promotion, filters);
+    const params = new URLSearchParams({
+      page: "1",
+      page_size: "12",
+      in_stock: "true",
+      sort_by: "stock_desc",
+    });
+    if (criteria.category) params.set("category", criteria.category);
+    else if (criteria.brand) params.set("brand", criteria.brand);
+    else if (criteria.flavor) params.set("flavor", criteria.flavor);
+    else if (criteria.search) params.set("search", criteria.search);
+    api<ProductList>(`/api/products?${params.toString()}`)
+      .then((result) => setPromotionProducts(result.items))
+      .catch(() => setPromotionProducts([]));
+  }, [filters, promotion]);
 
   useEffect(() => {
     setProducts(null);
@@ -168,12 +208,52 @@ export default function Home() {
         </div>
       </section>
 
-      {promotion && <section className="content-promotion shell"><div><p className="kicker">Selection NUTRIFIT</p><h2>{cleanPublishedText(promotion.title)}</h2>{promotion.subtitle && <strong>{cleanPublishedText(promotion.subtitle)}</strong>}<p>{cleanPublishedText(promotion.body)}</p></div><a href="#catalogue" className="button" onClick={applyPromotionFilter}>Voir les produits</a></section>}
+      {bestSellers.length > 0 && (
+        <div className="storefront-rail shell">
+          <ProductRail
+            eyebrow="Choix des clients"
+            title="Les plus vendus"
+            subtitle="Les références les plus commandées sur NUTRIFIT."
+            products={bestSellers}
+          />
+        </div>
+      )}
+
+      {promotion && (
+        <>
+          <section className="content-promotion shell">
+            <div>
+              <p className="kicker">Offre NUTRIFIT</p>
+              <h2>{cleanPublishedText(promotion.title)}</h2>
+              {promotion.subtitle && <strong>{cleanPublishedText(promotion.subtitle)}</strong>}
+              <p>{cleanPublishedText(promotion.body)}</p>
+            </div>
+            <a href="#catalogue" className="button" onClick={applyPromotionFilter}>
+              Voir toute la sélection
+            </a>
+          </section>
+          {promotionProducts.length > 0 && (
+            <div className="storefront-rail promotion-rail shell">
+              <ProductRail
+                eyebrow="Sélection promotionnelle"
+                title="Offres & packs"
+                subtitle="Les sélections publiées par votre équipe et les agents NUTRIFIT."
+                products={promotionProducts}
+              />
+            </div>
+          )}
+        </>
+      )}
 
       <section className="catalogue shell" id="catalogue">
-        <div className="section-heading">
-          <div><p className="kicker">La sélection NUTRIFIT</p><h2>Choisis ton prochain objectif</h2></div>
-          <p className="result-count">{products ? `${products.total} résultats` : "Chargement…"}</p>
+        <div className="catalogue-heading">
+          <p className="kicker">La sélection NUTRIFIT</p>
+          <h2>Tout le catalogue</h2>
+          <p>
+            {products
+              ? `${products.total} produits selon tes critères`
+              : "Chargement de la sélection..."}
+          </p>
         </div>
         <div className="filters-bar">
           <label className="search-field"><span>Rechercher</span><input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Produit ou marque…" /></label>
@@ -188,9 +268,14 @@ export default function Home() {
         </div>
         {error && <div className="alert alert-error">{error}</div>}
         {!products ? (
-          <div className="product-grid">{Array.from({ length: 8 }).map((_, index) => <div className="skeleton-card" key={index}><Skeleton height={230} borderRadius={20} /><Skeleton count={3} /></div>)}</div>
+          <div className="product-rail product-rail-loading">{Array.from({ length: 6 }).map((_, index) => <div className="skeleton-card" key={index}><Skeleton height={230} borderRadius={8} /><Skeleton count={3} /></div>)}</div>
         ) : products.items.length ? (
-          <div className="product-grid">{products.items.map((product) => <ProductCard key={product.product_id} product={product} />)}</div>
+          <ProductRail
+            eyebrow="Résultats"
+            title="Produits disponibles"
+            subtitle="Fais défiler horizontalement pour découvrir toute la sélection."
+            products={products.items}
+          />
         ) : (
           <div className="empty-state"><h3>Aucun produit trouvé</h3><p>Essayez une autre recherche.</p></div>
         )}

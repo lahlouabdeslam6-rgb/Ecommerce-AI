@@ -59,14 +59,35 @@ test("anonymous visitors can inspect products and use a guest cart", async () =>
 });
 
 test("catalogue includes price, brand and flavor filters plus full footer", async () => {
-  const [homeSource, footerSource] = await Promise.all([
+  const [homeSource, headerSource, cartSummarySource, railSource, footerSource] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/Header.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/components/CommerceCartSummary.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/components/ProductRail.tsx", import.meta.url),
+      "utf8",
+    ),
     readFile(new URL("../app/components/SiteFooter.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(homeSource, /Prix minimum/);
   assert.match(homeSource, /Prix maximum/);
   assert.match(homeSource, /<span>Marque<\/span>/);
   assert.match(homeSource, /<span>Parfum<\/span>/);
+  assert.match(homeSource, /\/api\/products\/best-sellers\?limit=12/);
+  assert.match(homeSource, /title="Les plus vendus"/);
+  assert.match(homeSource, /title="Offres & packs"/);
+  assert.match(homeSource, /title="Produits disponibles"/);
+  assert.doesNotMatch(homeSource, /className="product-grid"/);
+  assert.match(headerSource, /className="commerce-search"/);
+  assert.match(headerSource, /CommerceCartSummary/);
+  assert.match(headerSource, /Rechercher un produit ou une marque/);
+  assert.match(cartSummarySource, /cart\.item_count/);
+  assert.match(cartSummarySource, /money\(cart\.subtotal, cart\.currency\)/);
+  assert.match(railSource, /className="product-rail"/);
+  assert.match(railSource, /scrollBy/);
   assert.match(homeSource, /<SiteFooter \/>/);
   assert.match(footerSource, /footer-grid/);
   assert.match(footerSource, /support@nutrifit\.ma/);
@@ -227,10 +248,11 @@ test("published promotions filter the matching catalogue segment", async () => {
     "utf8",
   );
   assert.match(source, /applyPromotionFilter/);
-  assert.match(source, /setCategory\(mentionedCategory\)/);
-  assert.match(source, /setBrand\(mentionedBrand\)/);
-  assert.match(source, /setFlavor\(mentionedFlavor\)/);
-  assert.match(source, /Voir les produits/);
+  assert.match(source, /promotionCriteria/);
+  assert.match(source, /setCategory\(criteria\.category\)/);
+  assert.match(source, /setBrand\(criteria\.brand\)/);
+  assert.match(source, /setFlavor\(criteria\.flavor\)/);
+  assert.match(source, /Voir toute la sélection/);
   assert.match(source, /cleanPublishedText/);
 });
 

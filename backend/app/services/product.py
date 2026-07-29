@@ -62,6 +62,10 @@ class ProductService:
             )
         return ProductResponse.model_validate(product)
 
+    async def get_products(self, product_ids: list[int]) -> list[ProductResponse]:
+        products = await self.repository.get_by_product_ids(product_ids)
+        return [ProductResponse.model_validate(product) for product in products]
+
     async def catalog_filters(self) -> dict[str, list[str]]:
         return await self.repository.catalog_filters()
 
