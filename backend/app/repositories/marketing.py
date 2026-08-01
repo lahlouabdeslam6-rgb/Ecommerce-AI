@@ -72,6 +72,29 @@ class MarketingRepository:
         )
         return list(result.scalars().all()), total
 
+    async def recent_promoted_product_counts(
+        self,
+        *,
+        limit: int = 20,
+    ) -> dict[int, int]:
+        result = await self.session.execute(
+            select(AIMarketingCampaign)
+            .where(
+                AIMarketingCampaign.campaign_type == "promotion",
+                AIMarketingCampaign.status.in_(["draft", "approved"]),
+            )
+            .order_by(
+                AIMarketingCampaign.created_at.desc(),
+                AIMarketingCampaign.id.desc(),
+            )
+            .limit(limit)
+        )
+        counts: dict[int, int] = {}
+        for campaign in result.scalars().all():
+            for product_id in set(campaign.product_ids):
+                counts[product_id] = counts.get(product_id, 0) + 1
+        return counts
+
     async def update(
         self,
         campaign: AIMarketingCampaign,

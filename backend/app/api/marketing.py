@@ -35,6 +35,7 @@ async def suggest_promotion(
 ) -> PromotionSuggestionResponse:
     return await PromotionScoringService(session).suggest(
         promotion_kind=data.promotion_kind,
+        selection_strategy=data.selection_strategy,
         product_ids=data.product_ids or None,
     )
 

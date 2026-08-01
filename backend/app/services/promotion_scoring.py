@@ -6,6 +6,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.analytics import AnalyticsRepository
+from app.repositories.marketing import MarketingRepository
 from app.repositories.promotion_signals import PromotionSignalsRepository
 from app.schemas.marketing import (
     PromotionProductScore,
@@ -22,6 +23,7 @@ class PromotionScoringService:
 
     def __init__(self, session: AsyncSession) -> None:
         self.analytics = AnalyticsRepository(session)
+        self.marketing = MarketingRepository(session)
         self.signals = PromotionSignalsRepository(session)
         self.products = ProductService()
 
@@ -29,6 +31,7 @@ class PromotionScoringService:
         self,
         *,
         promotion_kind: str,
+        selection_strategy: str = "balanced",
         product_ids: list[int] | None = None,
     ) -> PromotionSuggestionResponse:
         now = datetime.now(UTC)
@@ -74,6 +77,9 @@ class PromotionScoringService:
             start=now - timedelta(days=90),
             end=now,
         )
+        recent_campaigns = await self.marketing.recent_promoted_product_counts(
+            limit=20,
+        )
         scored = self._score_products(
             candidates,
             sales_90=sales_90,
@@ -81,6 +87,8 @@ class PromotionScoringService:
             previous_30=previous_30,
             views_90=views_90,
             costs=costs,
+            selection_strategy=selection_strategy,
+            recent_campaigns=recent_campaigns,
         )
 
         if product_ids:
@@ -95,10 +103,24 @@ class PromotionScoringService:
                     status.HTTP_409_CONFLICT,
                     "One or more selected products are inactive or out of stock",
                 )
-        elif promotion_kind == "pack":
-            selected = self._select_pack(scored, pairs)
         else:
-            selected = scored[:1]
+            expected_count = 2 if promotion_kind == "pack" else 1
+            fresh_candidates = [
+                item for item in scored if item.recent_campaigns == 0
+            ]
+            selection_pool = (
+                fresh_candidates
+                if len(fresh_candidates) >= expected_count
+                else scored
+            )
+            if promotion_kind == "pack":
+                selected = self._select_pack(
+                    selection_pool,
+                    pairs,
+                    selection_strategy=selection_strategy,
+                )
+            else:
+                selected = selection_pool[:1]
 
         expected = 2 if promotion_kind == "pack" else 1
         if len(selected) < expected:
@@ -134,6 +156,7 @@ class PromotionScoringService:
             )
         return PromotionSuggestionResponse(
             promotion_kind=promotion_kind,
+            selection_strategy=selection_strategy,
             products=selected,
             regular_total=regular_total,
             suggested_discount_percentage=suggested_discount,
@@ -143,8 +166,9 @@ class PromotionScoringService:
             ),
             currency=selected[0].currency,
             data_notes=[
-                "Score: ventes 90 jours, dynamique 30 jours, stock, tendance, prix, conversion et marge disponible.",
-                "Les packs favorisent aussi les produits achetes ensemble et les categories complementaires.",
+                _strategy_note(selection_strategy),
+                "Les produits deja proposes recemment sont ecartes en priorite afin de varier les promotions.",
+                "Les packs equilibres associent un produit attractif a un produit en stock qui vend moins.",
                 (
                     "Le taux de conversion utilise les vues produit enregistrees."
                     if views_90
@@ -194,9 +218,12 @@ class PromotionScoringService:
         previous_30: list[dict],
         views_90: dict[int, int] | None = None,
         costs: dict[int, float] | None = None,
+        selection_strategy: str = "balanced",
+        recent_campaigns: dict[int, int] | None = None,
     ) -> list[PromotionProductScore]:
         views_90 = views_90 or {}
         costs = costs or {}
+        recent_campaigns = recent_campaigns or {}
         units_90 = {
             int(item["product_id"]): int(item["quantity"])
             for item in sales_90
@@ -252,16 +279,65 @@ class PromotionScoringService:
                 else 0
             )
             margin_score = min(margin_rate / 0.5, 1)
-            score = round(
-                100
-                * (
-                    sales_score * 0.27
-                    + momentum_score * 0.15
-                    + stock_score * 0.18
-                    + trend_score * 0.10
-                    + price_score * 0.08
-                    + conversion_score * 0.12
+            slow_sales_score = 1 - sales_score
+            low_momentum_score = 1 - momentum_score
+            strategy_scores = {
+                "best_sellers": (
+                    sales_score * 0.45
+                    + momentum_score * 0.20
+                    + conversion_score * 0.15
+                    + stock_score * 0.10
                     + margin_score * 0.10
+                ),
+                "overstock": (
+                    stock_score * 0.50
+                    + slow_sales_score * 0.25
+                    + low_momentum_score * 0.10
+                    + margin_score * 0.10
+                    + price_score * 0.05
+                ),
+                "slow_movers": (
+                    slow_sales_score * 0.40
+                    + stock_score * 0.30
+                    + low_momentum_score * 0.10
+                    + price_score * 0.10
+                    + margin_score * 0.10
+                ),
+                "complementary_pack": (
+                    sales_score * 0.25
+                    + momentum_score * 0.10
+                    + stock_score * 0.25
+                    + slow_sales_score * 0.15
+                    + conversion_score * 0.10
+                    + margin_score * 0.10
+                    + price_score * 0.05
+                ),
+                "balanced": (
+                    sales_score * 0.22
+                    + momentum_score * 0.12
+                    + stock_score * 0.24
+                    + slow_sales_score * 0.10
+                    + trend_score * 0.08
+                    + price_score * 0.06
+                    + conversion_score * 0.10
+                    + margin_score * 0.08
+                ),
+            }
+            recent_count = recent_campaigns.get(product_id, 0)
+            recent_penalty = (
+                min(18 + (recent_count - 1) * 7, 45)
+                if recent_count
+                else 0
+            )
+            score = round(
+                max(
+                    strategy_scores.get(
+                        selection_strategy,
+                        strategy_scores["balanced"],
+                    )
+                    * 100
+                    - recent_penalty,
+                    0,
                 ),
                 1,
             )
@@ -272,6 +348,10 @@ class PromotionScoringService:
                 reasons.append("demande recente en hausse")
             if product.stock >= 20:
                 reasons.append(f"stock confortable: {product.stock}")
+            if product.stock >= 20 and sold_90 <= max(int(max_90 * 0.15), 2):
+                reasons.append(
+                    f"stock a relancer: seulement {sold_90} vente(s) sur 90 jours"
+                )
             if views_90.get(product_id):
                 reasons.append(
                     f"conversion observee: {conversion_rates[product_id] * 100:.1f}%"
@@ -279,6 +359,10 @@ class PromotionScoringService:
             if cost_price is not None:
                 reasons.append(
                     f"marge brute renseignee: {margin_rate * 100:.1f}%"
+                )
+            if recent_count:
+                reasons.append(
+                    f"deja propose dans {recent_count} campagne(s) recente(s): priorite reduite"
                 )
             if not reasons:
                 reasons.append("produit actif et disponible")
@@ -292,6 +376,9 @@ class PromotionScoringService:
                     currency=product.currency,
                     stock=product.stock,
                     score=score,
+                    units_sold_90=sold_90,
+                    units_sold_30=sold_30,
+                    recent_campaigns=recent_count,
                     reasons=reasons,
                 )
             )
@@ -305,9 +392,13 @@ class PromotionScoringService:
     def _select_pack(
         scored: list[PromotionProductScore],
         pairs: list[dict[str, int]],
+        *,
+        selection_strategy: str = "balanced",
     ) -> list[PromotionProductScore]:
         if len(scored) < 2:
             return scored
+        if selection_strategy in {"best_sellers", "overstock", "slow_movers"}:
+            return scored[:3]
         pair_counts: dict[frozenset[int], int] = {
             frozenset(
                 (
@@ -318,13 +409,33 @@ class PromotionScoringService:
             for item in pairs
         }
         max_pair_count = max(pair_counts.values(), default=1)
-        selected = [scored[0]]
-        candidates = scored[1:80]
+        max_stock = max((item.stock for item in scored), default=1)
+        max_sales = max((item.units_sold_90 for item in scored), default=1)
+        anchor = max(
+            scored,
+            key=lambda item: (
+                item.units_sold_90 / max(max_sales, 1) * 60
+                + item.score * 0.40
+            ),
+        )
+        selected = [anchor]
+        candidates = [
+            item
+            for item in scored
+            if item.product_id != anchor.product_id
+        ]
         while candidates and len(selected) < 3:
             best = max(
                 candidates,
                 key=lambda candidate: (
-                    candidate.score * 0.6
+                    candidate.score * 0.25
+                    + (
+                        candidate.stock / max_stock
+                        * (1 - candidate.units_sold_90 / max(max_sales, 1))
+                        * 30
+                        if selection_strategy == "balanced"
+                        else 0
+                    )
                     + max(
                         (
                             pair_counts.get(
@@ -368,6 +479,26 @@ class PromotionScoringService:
                 best.category != current.category for current in selected
             ):
                 best.reasons.append("categorie complementaire dans le pack")
+            if (
+                best.stock >= 20
+                and best.units_sold_90 <= max(int(max_sales * 0.15), 2)
+            ):
+                best.reasons.append(
+                    "ajoute au pack pour relancer un stock qui vend peu"
+                )
             selected.append(best)
             candidates.remove(best)
         return selected
+
+
+def _strategy_note(selection_strategy: str) -> str:
+    return {
+        "balanced": (
+            "Strategie equilibree: ventes, stock, produits a relancer, "
+            "conversion et marge."
+        ),
+        "best_sellers": "Strategie meilleures ventes: priorite a la demande et a la conversion.",
+        "overstock": "Strategie stock eleve: priorite aux produits disponibles qui tournent peu.",
+        "slow_movers": "Strategie produits a relancer: ventes faibles et stock disponible.",
+        "complementary_pack": "Strategie pack complementaire: achats ensemble et categories variees.",
+    }.get(selection_strategy, "Strategie equilibree.")

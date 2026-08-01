@@ -272,6 +272,9 @@ async def test_automatic_pack_suggestion_selects_only_three_products() -> None:
     )
     service.analytics.top_products = AsyncMock(return_value=[])
     service.analytics.co_purchase_pairs = AsyncMock(return_value=[])
+    service.marketing.recent_promoted_product_counts = AsyncMock(
+        return_value={}
+    )
     service.signals.cost_map = AsyncMock(return_value={})
     service.signals.view_counts = AsyncMock(return_value={})
 
@@ -299,6 +302,9 @@ async def test_suggested_discount_preserves_minimum_margin() -> None:
     )
     service.analytics.top_products = AsyncMock(return_value=[])
     service.analytics.co_purchase_pairs = AsyncMock(return_value=[])
+    service.marketing.recent_promoted_product_counts = AsyncMock(
+        return_value={}
+    )
     service.signals.cost_map = AsyncMock(return_value={1: 80})
     service.signals.view_counts = AsyncMock(return_value={})
 
@@ -312,6 +318,50 @@ async def test_suggested_discount_preserves_minimum_margin() -> None:
         "Marge brute minimale de 15%" in note
         for note in suggestion.data_notes
     )
+
+
+@pytest.mark.asyncio
+async def test_automatic_suggestion_skips_recently_promoted_product() -> None:
+    products = [
+        ProductResponse(
+            product_id=1,
+            name="Ancienne promotion",
+            category="protein",
+            price=200,
+            stock=50,
+        ),
+        ProductResponse(
+            product_id=2,
+            name="Nouvelle promotion",
+            category="creatine",
+            price=200,
+            stock=40,
+        ),
+    ]
+    service = PromotionScoringService(AsyncMock())
+    service.products.list_products = AsyncMock(
+        return_value=SimpleNamespace(items=products)
+    )
+    service.analytics.top_products = AsyncMock(
+        side_effect=[
+            [{"product_id": 1, "quantity": 20}],
+            [{"product_id": 1, "quantity": 8}],
+            [{"product_id": 1, "quantity": 6}],
+        ]
+    )
+    service.analytics.co_purchase_pairs = AsyncMock(return_value=[])
+    service.marketing.recent_promoted_product_counts = AsyncMock(
+        return_value={1: 1}
+    )
+    service.signals.cost_map = AsyncMock(return_value={})
+    service.signals.view_counts = AsyncMock(return_value={})
+
+    suggestion = await service.suggest(
+        promotion_kind="single_product",
+        selection_strategy="balanced",
+    )
+
+    assert suggestion.products[0].product_id == 2
 
 
 def test_promotion_score_uses_conversion_and_private_margin() -> None:
@@ -332,3 +382,115 @@ def test_promotion_score_uses_conversion_and_private_margin() -> None:
     )
     assert "conversion observee: 20.0%" in scored[0].reasons
     assert "marge brute renseignee: 50.0%" in scored[0].reasons
+
+
+def test_recent_campaign_penalty_rotates_automatic_selection() -> None:
+    products = [
+        ProductResponse(
+            product_id=1,
+            name="Produit deja propose",
+            category="protein",
+            price=200,
+            stock=40,
+        ),
+        ProductResponse(
+            product_id=2,
+            name="Nouvelle option",
+            category="protein",
+            price=200,
+            stock=40,
+        ),
+    ]
+
+    scored = PromotionScoringService._score_products(
+        products,
+        sales_90=[
+            {"product_id": 1, "quantity": 10},
+            {"product_id": 2, "quantity": 10},
+        ],
+        sales_30=[
+            {"product_id": 1, "quantity": 3},
+            {"product_id": 2, "quantity": 3},
+        ],
+        previous_30=[],
+        recent_campaigns={1: 1},
+    )
+
+    assert scored[0].product_id == 2
+    assert scored[1].recent_campaigns == 1
+    assert any("priorite reduite" in reason for reason in scored[1].reasons)
+
+
+def test_overstock_strategy_prioritizes_stock_with_low_sales() -> None:
+    products = [
+        ProductResponse(
+            product_id=1,
+            name="Meilleure vente",
+            category="protein",
+            price=200,
+            stock=10,
+        ),
+        ProductResponse(
+            product_id=2,
+            name="Stock a relancer",
+            category="vitamins",
+            price=200,
+            stock=100,
+        ),
+    ]
+
+    scored = PromotionScoringService._score_products(
+        products,
+        sales_90=[
+            {"product_id": 1, "quantity": 50},
+            {"product_id": 2, "quantity": 1},
+        ],
+        sales_30=[{"product_id": 1, "quantity": 20}],
+        previous_30=[],
+        selection_strategy="overstock",
+    )
+
+    assert scored[0].product_id == 2
+    assert any("stock a relancer" in reason for reason in scored[0].reasons)
+
+
+def test_balanced_pack_combines_popular_and_slow_stock() -> None:
+    scored = [
+        PromotionProductScore(
+            product_id=1,
+            name="Whey populaire",
+            category="protein",
+            price=300,
+            stock=30,
+            score=88,
+            units_sold_90=40,
+        ),
+        PromotionProductScore(
+            product_id=2,
+            name="Omega stock eleve",
+            category="wellness",
+            price=180,
+            stock=90,
+            score=70,
+            units_sold_90=1,
+        ),
+        PromotionProductScore(
+            product_id=3,
+            name="Autre bestseller",
+            category="protein",
+            price=250,
+            stock=20,
+            score=82,
+            units_sold_90=30,
+        ),
+    ]
+
+    selected = PromotionScoringService._select_pack(
+        scored,
+        [],
+        selection_strategy="balanced",
+    )
+
+    assert selected[0].product_id == 1
+    assert selected[1].product_id == 2
+    assert any("relancer" in reason for reason in selected[1].reasons)

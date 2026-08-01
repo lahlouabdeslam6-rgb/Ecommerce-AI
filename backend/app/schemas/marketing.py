@@ -22,6 +22,13 @@ MarketingTone = Literal["premium", "energetic", "educational", "direct"]
 MarketingChannel = Literal["instagram", "facebook", "email", "whatsapp"]
 PromotionKind = Literal["single_product", "pack"]
 PromotionSelectionMode = Literal["automatic", "manual"]
+PromotionSelectionStrategy = Literal[
+    "balanced",
+    "best_sellers",
+    "overstock",
+    "slow_movers",
+    "complementary_pack",
+]
 
 
 class PromotionProductScore(BaseModel):
@@ -33,11 +40,15 @@ class PromotionProductScore(BaseModel):
     currency: str = "MAD"
     stock: int
     score: float = Field(ge=0, le=100)
+    units_sold_90: int = 0
+    units_sold_30: int = 0
+    recent_campaigns: int = 0
     reasons: list[str] = Field(default_factory=list)
 
 
 class PromotionSuggestionRequest(BaseModel):
     promotion_kind: PromotionKind
+    selection_strategy: PromotionSelectionStrategy = "balanced"
     product_ids: list[int] = Field(default_factory=list)
 
     @field_validator("product_ids")
@@ -48,6 +59,7 @@ class PromotionSuggestionRequest(BaseModel):
 
 class PromotionSuggestionResponse(BaseModel):
     promotion_kind: PromotionKind
+    selection_strategy: PromotionSelectionStrategy = "balanced"
     products: list[PromotionProductScore]
     regular_total: float
     suggested_discount_percentage: float
@@ -86,6 +98,10 @@ class MarketingGenerateRequest(BaseModel):
     product_id: int | None = Field(default=None, ge=1)
     promotion_kind: PromotionKind | None = None
     selection_mode: PromotionSelectionMode | None = None
+    selection_strategy: PromotionSelectionStrategy = Field(
+        default="balanced",
+        exclude=True,
+    )
     product_ids: list[int] = Field(default_factory=list)
     discount_percentage: float | None = Field(default=None, ge=0, le=50)
     starts_at: datetime | None = None

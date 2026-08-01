@@ -51,6 +51,12 @@ type GenerateForm = {
   channels: string[];
   promotion_kind: "single_product" | "pack";
   selection_mode: "automatic" | "manual";
+  selection_strategy:
+    | "balanced"
+    | "best_sellers"
+    | "overstock"
+    | "slow_movers"
+    | "complementary_pack";
   product_ids: number[];
   discount_percentage: string;
   starts_at: string;
@@ -67,11 +73,15 @@ type PromotionProductScore = {
   currency: string;
   stock: number;
   score: number;
+  units_sold_90?: number;
+  units_sold_30?: number;
+  recent_campaigns?: number;
   reasons: string[];
 };
 
 type PromotionSuggestion = {
   promotion_kind: "single_product" | "pack";
+  selection_strategy: GenerateForm["selection_strategy"];
   products: PromotionProductScore[];
   regular_total: number;
   suggested_discount_percentage: number;
@@ -116,6 +126,7 @@ const emptyGenerate: GenerateForm = {
   channels: ["instagram"],
   promotion_kind: "single_product",
   selection_mode: "automatic",
+  selection_strategy: "balanced",
   product_ids: [],
   discount_percentage: "",
   starts_at: "",
@@ -133,6 +144,8 @@ export function MarketingAgentWorkspace() {
   const [suggestion, setSuggestion] = useState<PromotionSuggestion | null>(null);
   const [productSearch, setProductSearch] = useState("");
   const [productOptions, setProductOptions] = useState<ProductOption[]>([]);
+  const [reviewProductSearch, setReviewProductSearch] = useState("");
+  const [reviewProductOptions, setReviewProductOptions] = useState<ProductOption[]>([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -174,6 +187,37 @@ export function MarketingAgentWorkspace() {
     return () => window.clearTimeout(timer);
   }, [form.campaign_type, productSearch]);
 
+  useEffect(() => {
+    if (
+      !selected
+      || selected.campaign_type !== "promotion"
+      || selected.selection_mode !== "manual"
+    ) {
+      setReviewProductOptions([]);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      const params = new URLSearchParams({
+        page: "1",
+        page_size: "12",
+        in_stock: "true",
+        sort_by: "stock_desc",
+      });
+      if (reviewProductSearch.trim()) {
+        params.set("search", reviewProductSearch.trim());
+      }
+      api<ProductOptionList>(`/api/products?${params.toString()}`)
+        .then((result) => setReviewProductOptions(result.items))
+        .catch(() => setReviewProductOptions([]));
+    }, 220);
+    return () => window.clearTimeout(timer);
+  }, [
+    selected?.id,
+    selected?.campaign_type,
+    selected?.selection_mode,
+    reviewProductSearch,
+  ]);
+
   const togglePromotionProduct = (productId: number) => {
     setForm((current) => {
       if (current.promotion_kind === "single_product") {
@@ -187,6 +231,19 @@ export function MarketingAgentWorkspace() {
     setSuggestion(null);
   };
 
+  const toggleReviewedProduct = (productId: number) => {
+    setSelected((current) => {
+      if (!current) return current;
+      if (current.promotion_kind === "single_product") {
+        return { ...current, product_ids: [productId] };
+      }
+      const productIds = current.product_ids.includes(productId)
+        ? current.product_ids.filter((item) => item !== productId)
+        : [...current.product_ids, productId];
+      return { ...current, product_ids: productIds };
+    });
+  };
+
   const suggestPromotion = async () => {
     setSuggesting(true);
     setError("");
@@ -197,6 +254,7 @@ export function MarketingAgentWorkspace() {
           method: "POST",
           body: JSON.stringify({
             promotion_kind: form.promotion_kind,
+            selection_strategy: form.selection_strategy,
             product_ids:
               form.selection_mode === "manual" ? form.product_ids : [],
           }),
@@ -499,6 +557,11 @@ export function MarketingAgentWorkspace() {
                         setForm({
                           ...form,
                           promotion_kind: promotionKind,
+                          selection_strategy:
+                            promotionKind === "single_product"
+                            && form.selection_strategy === "complementary_pack"
+                              ? "balanced"
+                              : form.selection_strategy,
                           product_ids:
                             promotionKind === "single_product"
                               ? form.product_ids.slice(0, 1)
@@ -531,6 +594,40 @@ export function MarketingAgentWorkspace() {
                       <option value="manual">Manuelle par admin</option>
                     </select>
                   </label>
+                  {form.selection_mode === "automatic" && (
+                    <label className="full-field">
+                      Strategie de selection
+                      <select
+                        value={form.selection_strategy}
+                        onChange={(event) => {
+                          setForm({
+                            ...form,
+                            selection_strategy: event.target.value as
+                              GenerateForm["selection_strategy"],
+                          });
+                          setSuggestion(null);
+                        }}
+                      >
+                        <option value="balanced">
+                          Equilibree: ventes + stock a relancer
+                        </option>
+                        <option value="best_sellers">Meilleures ventes</option>
+                        <option value="overstock">
+                          Stock eleve avec ventes faibles
+                        </option>
+                        <option value="slow_movers">Produits a relancer</option>
+                        {form.promotion_kind === "pack" && (
+                          <option value="complementary_pack">
+                            Pack complementaire
+                          </option>
+                        )}
+                      </select>
+                      <small className="muted">
+                        La strategie equilibree varie les choix et evite les
+                        produits deja utilises dans les campagnes recentes.
+                      </small>
+                    </label>
+                  )}
                   {form.selection_mode === "manual" && (
                     <div className="full-field promotion-product-picker">
                       <label>
@@ -817,20 +914,83 @@ export function MarketingAgentWorkspace() {
                         <option value="manual">Admin</option>
                       </select>
                     </label>
-                    <label className="full-field">
-                      IDs produits selectionnes
-                      <input
-                        value={selected.product_ids.join(", ")}
-                        onChange={(event) =>
-                          updateSelected({
-                            product_ids: event.target.value
-                              .split(/[,\s]+/)
-                              .map((item) => Number(item))
-                              .filter((item) => Number.isInteger(item) && item > 0),
-                          })
-                        }
-                      />
-                    </label>
+                    {selected.selection_mode === "manual" ? (
+                      <div className="full-field promotion-product-picker review-product-picker">
+                        <label>
+                          Rechercher les produits
+                          <input
+                            value={reviewProductSearch}
+                            onChange={(event) =>
+                              setReviewProductSearch(event.target.value)
+                            }
+                            placeholder="Nom ou marque..."
+                          />
+                        </label>
+                        <div className="promotion-selected-products">
+                          {selected.product_ids.map((productId) => {
+                            const product =
+                              selected.selection_scores.find(
+                                (item) => item.product_id === productId,
+                              )
+                              || reviewProductOptions.find(
+                                (item) => item.product_id === productId,
+                              );
+                            return (
+                              <button
+                                type="button"
+                                key={productId}
+                                onClick={() => toggleReviewedProduct(productId)}
+                                aria-label={`Retirer ${product?.name || `produit ${productId}`}`}
+                              >
+                                <span>{product?.name || `Produit #${productId}`}</span>
+                                <b>Retirer</b>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div className="promotion-product-options">
+                          {reviewProductOptions.map((product) => (
+                            <button
+                              type="button"
+                              key={product.product_id}
+                              className={
+                                selected.product_ids.includes(product.product_id)
+                                  ? "selected"
+                                  : ""
+                              }
+                              onClick={() =>
+                                toggleReviewedProduct(product.product_id)
+                              }
+                            >
+                              <span>
+                                <strong>
+                                  {product.name || `Produit #${product.product_id}`}
+                                </strong>
+                                <small>
+                                  {product.brand || "NUTRIFIT"} · {product.stock} en stock
+                                </small>
+                              </span>
+                              <b>
+                                {product.price?.toFixed(2)} {product.currency}
+                              </b>
+                            </button>
+                          ))}
+                        </div>
+                        <small className="muted">
+                          {selected.product_ids.length} produit(s) selectionne(s)
+                          {selected.promotion_kind === "pack"
+                            ? " · minimum 2"
+                            : " · un seul produit"}
+                        </small>
+                      </div>
+                    ) : (
+                      <div className="full-field automatic-product-summary">
+                        <small>Produits choisis par Marketing Agent</small>
+                        {selected.selection_scores.map((product) => (
+                          <strong key={product.product_id}>{product.name}</strong>
+                        ))}
+                      </div>
+                    )}
                     <label>
                       Reduction (%)
                       <input

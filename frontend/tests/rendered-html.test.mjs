@@ -320,6 +320,13 @@ test("admin Marketing Agent keeps campaigns in a controlled approval flow", asyn
   assert.match(marketingSource, /Automatique par Marketing Agent/);
   assert.match(marketingSource, /Manuelle par admin/);
   assert.match(marketingSource, /Proposer les produits avec le score/);
+  assert.match(marketingSource, /Strategie de selection/);
+  assert.match(marketingSource, /Equilibree: ventes \+ stock a relancer/);
+  assert.match(marketingSource, /Stock eleve avec ventes faibles/);
+  assert.match(marketingSource, /Produits a relancer/);
+  assert.match(marketingSource, /reviewProductSearch/);
+  assert.match(marketingSource, /Retirer/);
+  assert.doesNotMatch(marketingSource, /IDs produits selectionnes/);
   assert.match(marketingSource, /Mode autonome/);
   assert.match(marketingSource, /Generer toute la promotion avec AI/);
   assert.match(

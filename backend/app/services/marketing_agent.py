@@ -181,6 +181,7 @@ class MarketingAgentService:
             return data, []
         suggestion = await PromotionScoringService(self.session).suggest(
             promotion_kind=data.promotion_kind or "single_product",
+            selection_strategy=data.selection_strategy,
             product_ids=(
                 data.product_ids
                 if data.selection_mode == "manual"
