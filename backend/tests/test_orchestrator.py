@@ -21,6 +21,8 @@ from app.services.orchestrator_service import (
     OrchestratorService,
     _extract_objective,
     _extract_price,
+    _is_out_of_scope,
+    _is_toxic_message,
     _normalize,
 )
 from app.services.safety_agent import SafetyAgentService
@@ -145,6 +147,36 @@ class TestNormalizeHelpers:
 
     def test_extract_objective_none(self) -> None:
         assert _extract_objective("hello world") is None
+
+    @pytest.mark.parametrize(
+        "message",
+        ["nta 7mar", "fuck you", "zbi", "quel assistant stupide"],
+    )
+    def test_toxic_messages_are_detected(self, message: str) -> None:
+        assert _is_toxic_message(message) is True
+
+    @pytest.mark.parametrize(
+        "message",
+        [
+            "quelle est la capitale de la France",
+            "ecris moi un programme Python",
+            "donne moi la meteo demain",
+        ],
+    )
+    def test_unrelated_messages_are_out_of_scope(self, message: str) -> None:
+        assert _is_out_of_scope(message) is True
+
+    @pytest.mark.parametrize(
+        "message",
+        [
+            "slm",
+            "bghit creatine ta7t 300 MAD",
+            "ou est ma commande",
+            "comment fonctionne le paiement",
+        ],
+    )
+    def test_store_messages_stay_in_scope(self, message: str) -> None:
+        assert _is_out_of_scope(message) is False
 
 
 # ---------------------------------------------------------------------------
@@ -409,6 +441,40 @@ class TestCompoundCreatineBudget:
         assert call_kwargs[0][0] == 7  # user_id
         assert call_kwargs[1]["objective"] == "creatine"
         assert call_kwargs[1]["max_price"] == 300.0
+
+
+# ---------------------------------------------------------------------------
+# Integration tests: conversation guardrails
+# ---------------------------------------------------------------------------
+
+class TestConversationGuardrails:
+
+    @pytest.mark.asyncio
+    async def test_toxic_message_returns_a_polite_block(self) -> None:
+        response = await OrchestratorService().execute(
+            OrchestratorRequest(message="nta 7mar")
+        )
+
+        assert response.detected_intent == "moderation"
+        assert response.selected_agents == ["support"]
+        assert response.results[0].status == "blocked"
+        assert "Reformulez votre demande avec respect" in (
+            response.results[0].data["answer"]
+        )
+        assert response.requires_confirmation is False
+
+    @pytest.mark.asyncio
+    async def test_off_topic_message_stays_out_of_catalogue_agents(self) -> None:
+        response = await OrchestratorService().execute(
+            OrchestratorRequest(message="quelle est la capitale de la France")
+        )
+
+        assert response.detected_intent == "out_of_scope"
+        assert response.selected_agents == ["support"]
+        assert response.results[0].status == "success"
+        assert "uniquement vous aider concernant NUTRIFIT" in (
+            response.results[0].data["answer"]
+        )
 
 
 # ---------------------------------------------------------------------------

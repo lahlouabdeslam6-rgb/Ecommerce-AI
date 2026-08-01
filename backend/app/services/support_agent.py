@@ -93,6 +93,23 @@ class SupportAgentService:
         normalized = _normalize(request.message)
         topic = self._detect_topic(normalized)
 
+        if topic == "greeting":
+            return SupportAgentResponse(
+                topic=topic,
+                answer=(
+                    "Bonjour et bienvenue chez NUTRIFIT ! Comment puis-je vous "
+                    "aider aujourd'hui ? Je peux vous conseiller sur les produits, "
+                    "le paiement, la livraison ou le suivi de votre commande."
+                ),
+                needs_human=False,
+                suggested_questions=[
+                    "Je cherche un produit",
+                    "Où est ma dernière commande ?",
+                    "Comment fonctionne la livraison ?",
+                ],
+                model="accueil NUTRIFIT",
+            )
+
         if topic == "medical_safety":
             return SupportAgentResponse(
                 topic=topic,
@@ -449,6 +466,14 @@ class SupportAgentService:
     @staticmethod
     def _detect_topic(normalized: str) -> str:
         tokens = set(re.findall(r"[a-z0-9]+", normalized))
+        greeting_words = {
+            "bonjour", "bonsoir", "hello", "hey", "hi", "salam", "salut", "slm",
+        }
+        greeting_fillers = {
+            "ca", "cava", "cv", "kidayr", "kidayra", "labas", "va",
+        }
+        if tokens & greeting_words and tokens <= (greeting_words | greeting_fillers):
+            return "greeting"
         if tokens & {
             "grossesse", "enceinte", "allaitement", "maladie", "medicament",
             "traitement", "diabete", "cancer", "hypertension", "diagnostic",

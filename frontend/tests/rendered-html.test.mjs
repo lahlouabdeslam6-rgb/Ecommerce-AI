@@ -406,6 +406,8 @@ test("customer AI assistant routes requests through the Orchestrator", async () 
   assert.match(assistantSource, /Je cherche de la créatine à moins de 300 MAD/);
   assert.match(assistantSource, /Où est ma dernière commande/);
   assert.match(assistantSource, /Produits \+ Commandes \+ Support \+ Sécurité/);
+  assert.match(resultSource, /Message inapproprié/);
+  assert.match(resultSource, /Demande hors sujet/);
   assert.match(resultSource, /Recommendation Agent/);
   assert.match(resultSource, /Support Agent/);
   assert.match(resultSource, /Safety Agent/);

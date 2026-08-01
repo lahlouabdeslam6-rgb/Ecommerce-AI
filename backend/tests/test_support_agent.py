@@ -250,6 +250,42 @@ async def test_payment_answer_uses_local_site_rules() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("message", ["slm", "salut", "hi", "bonjour", "salam labas"])
+async def test_greeting_receives_an_immediate_welcome(message: str) -> None:
+    support = service()
+    support._generate_answer = AsyncMock()  # type: ignore[method-assign]
+
+    result = await support.preview(
+        SupportAgentRequest(message=message),
+        use_ai=True,
+    )
+
+    assert result.topic == "greeting"
+    assert "bienvenue chez NUTRIFIT" in result.answer
+    assert result.needs_human is False
+    support._generate_answer.assert_not_awaited()
+
+
+def test_orchestrator_routes_short_greetings_to_support() -> None:
+    orchestrator = OrchestratorService()
+
+    for message in ("slm", "salut", "hi", "bonjour", "salam cv"):
+        assert orchestrator._detect_domain_intent(message, None) == "support"
+
+
+def test_greeting_with_a_product_request_keeps_the_real_intent() -> None:
+    orchestrator = OrchestratorService()
+
+    assert (
+        orchestrator._detect_domain_intent(
+            "salut bghit creatine ta7t 300 MAD",
+            None,
+        )
+        == "compound"
+    )
+
+
+@pytest.mark.asyncio
 async def test_product_answer_is_grounded_in_catalogue() -> None:
     result = await service().preview(
         SupportAgentRequest(

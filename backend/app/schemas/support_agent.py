@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 
 SupportTopic = Literal[
+    "greeting",
     "order",
     "delivery",
     "payment",

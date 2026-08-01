@@ -29,6 +29,8 @@ const intentLabels: Record<string, string> = {
   stock_forecast: "Prévision du stock",
   delivery: "Suivi des livraisons",
   seo: "Référencement SEO",
+  moderation: "Message inapproprié",
+  out_of_scope: "Demande hors sujet",
 };
 
 const statusLabels: Record<string, string> = {

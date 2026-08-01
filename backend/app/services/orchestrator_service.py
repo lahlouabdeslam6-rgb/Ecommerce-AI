@@ -113,6 +113,24 @@ _INTENT_KEYWORDS: dict[str, set[str]] = {
     },
 }
 
+_GREETING_WORDS = {
+    "bonjour", "bonsoir", "hello", "hey", "hi", "salam", "salut", "slm",
+}
+_GREETING_FILLERS = {
+    "ca", "cava", "cv", "kidayr", "kidayra", "labas", "va",
+}
+_TOXIC_WORDS = {
+    "7mar", "bitch", "con", "connard", "fuck", "hmare", "idiot",
+    "imbecile", "kharra", "m9awed", "m9wda", "pute", "qahba", "shit",
+    "stupide", "zbi", "9ahba", "9lawi",
+}
+_STORE_SCOPE_WORDS = {
+    "acheter", "assistant", "boutique", "client", "compte", "conseil",
+    "conseiller", "marque", "nutrifit", "panier", "prix", "service",
+    "shaker", "site", "supplement", "supplements", "complement",
+    "complements", "sport", "sportif", "sportifs",
+}
+
 
 def _normalize(text: str) -> str:
     """Strip accents and collapse whitespace to lowercase."""
@@ -149,6 +167,30 @@ def _extract_objective(text: str) -> str | None:
     return None
 
 
+def _is_greeting(text: str) -> bool:
+    """Recognize a short greeting without hiding a real customer request."""
+    tokens = set(re.findall(r"[a-z0-9]+", _normalize(text)))
+    return bool(tokens & _GREETING_WORDS) and tokens <= (
+        _GREETING_WORDS | _GREETING_FILLERS
+    )
+
+
+def _is_toxic_message(text: str) -> bool:
+    tokens = set(re.findall(r"[a-z0-9]+", _normalize(text)))
+    return bool(tokens & _TOXIC_WORDS)
+
+
+def _is_out_of_scope(text: str) -> bool:
+    """Reject clearly unrelated requests before invoking catalogue agents."""
+    normalized = _normalize(text)
+    if _is_greeting(normalized):
+        return False
+    tokens = set(re.findall(r"[a-z0-9]+", normalized))
+    domain_words = set().union(*_INTENT_KEYWORDS.values())
+    domain_words.update(_STORE_SCOPE_WORDS)
+    return not bool(tokens & domain_words) and _extract_objective(normalized) is None
+
+
 class OrchestratorService:
     """Coordonne les agents NUTRIFIT sans mutation automatique."""
 
@@ -168,6 +210,27 @@ class OrchestratorService:
         self, request: OrchestratorRequest
     ) -> OrchestratorResponse:
         message_normalised = _normalize(request.message)
+
+        if _is_toxic_message(message_normalised):
+            return self._guardrail_response(
+                intent="moderation",
+                answer=(
+                    "Je suis là pour vous aider, mais je ne peux pas poursuivre "
+                    "avec des insultes ou un contenu offensant. Reformulez votre "
+                    "demande avec respect."
+                ),
+                status_value="blocked",
+            )
+
+        if request.task_type is None and _is_out_of_scope(message_normalised):
+            return self._guardrail_response(
+                intent="out_of_scope",
+                answer=(
+                    "Je peux uniquement vous aider concernant NUTRIFIT : produits, "
+                    "recommandations, commandes, paiements, livraisons et support "
+                    "client."
+                ),
+            )
 
         # 1. Mutation detection and intent resolution
         is_mutation = self._is_mutation(message_normalised)
@@ -291,6 +354,38 @@ class OrchestratorService:
             proposed_action=proposed_action,
         )
 
+    @staticmethod
+    def _guardrail_response(
+        *,
+        intent: str,
+        answer: str,
+        status_value: str = "success",
+    ) -> OrchestratorResponse:
+        return OrchestratorResponse(
+            detected_intent=intent,
+            selected_agents=["support"],
+            results=[
+                AgentResult(
+                    agent="support",
+                    status=status_value,
+                    data={
+                        "topic": intent,
+                        "answer": answer,
+                        "needs_human": False,
+                        "suggested_questions": [
+                            "Je cherche un produit",
+                            "Où est ma dernière commande ?",
+                            "Comment fonctionne la livraison ?",
+                        ],
+                        "model": "regles conversationnelles NUTRIFIT",
+                        "read_only": True,
+                    },
+                )
+            ],
+            requires_confirmation=False,
+            proposed_action=None,
+        )
+
     # ------------------------------------------------------------------
     # Intent detection
     # ------------------------------------------------------------------
@@ -305,6 +400,9 @@ class OrchestratorService:
 
         normalised = _normalize(normalised)
         tokens = set(re.findall(r"[a-z0-9]+", normalised))
+
+        if _is_greeting(normalised):
+            return "support"
 
         seo_hits = tokens & _INTENT_KEYWORDS["seo"]
         if seo_hits:
