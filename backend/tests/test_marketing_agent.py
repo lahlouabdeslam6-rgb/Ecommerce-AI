@@ -1,3 +1,4 @@
+from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -5,8 +6,11 @@ import pytest
 from fastapi import HTTPException
 
 from app.models.ai_marketing import AIMarketingCampaign
-from app.schemas.marketing import MarketingGenerateRequest
-from app.schemas.marketing import PromotionProductScore
+from app.schemas.marketing import (
+    MarketingCampaignUpdate,
+    MarketingGenerateRequest,
+    PromotionProductScore,
+)
 from app.schemas.product import ProductResponse
 from app.services.marketing_agent import (
     OLLAMA_MARKETING_SCHEMA,
@@ -134,6 +138,18 @@ def test_manual_pack_accepts_more_than_four_products() -> None:
     )
 
     assert request.product_ids == [10, 20, 30, 40, 50, 60]
+
+
+def test_marketing_update_keeps_datetime_objects_for_sqlite() -> None:
+    data = MarketingCampaignUpdate(
+        starts_at="2026-08-01T20:55:00Z",
+        ends_at="2026-08-08T20:55:00Z",
+    )
+
+    values = MarketingAgentService._database_update_values(data)
+
+    assert isinstance(values["starts_at"], datetime)
+    assert isinstance(values["ends_at"], datetime)
 
 
 def test_promotion_allows_an_autonomous_empty_brief() -> None:

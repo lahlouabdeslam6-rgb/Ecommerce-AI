@@ -325,6 +325,9 @@ test("admin Marketing Agent keeps campaigns in a controlled approval flow", asyn
   assert.match(marketingSource, /Stock eleve avec ventes faibles/);
   assert.match(marketingSource, /Produits a relancer/);
   assert.match(marketingSource, /reviewProductSearch/);
+  assert.match(marketingSource, /selectedPromotionScores/);
+  assert.match(marketingSource, /Recalcul des scores en cours/);
+  assert.match(marketingSource, /readableMarketingError/);
   assert.match(marketingSource, /Retirer/);
   assert.doesNotMatch(marketingSource, /IDs produits selectionnes/);
   assert.match(marketingSource, /Mode autonome/);
@@ -341,6 +344,8 @@ test("admin Marketing Agent keeps campaigns in a controlled approval flow", asyn
   assert.match(marketingSource, /marge/i);
   assert.match(marketingSource, /marketing-short-textarea/);
   assert.match(styles, /overflow-x:\s*clip/);
+  assert.match(styles, /\.review-product-picker \.promotion-product-options button/);
+  assert.match(styles, /\.promotion-score-reasons/);
   assert.match(
     styles,
     /\.marketing-agent-workspace \.marketing-review textarea\.marketing-short-textarea/,

@@ -134,6 +134,13 @@ const emptyGenerate: GenerateForm = {
   offer_details: "",
 };
 
+function readableMarketingError(err: unknown) {
+  const detail = (err as Error).message;
+  return detail === "Failed to fetch"
+    ? "Connexion au serveur impossible. Verifie que le backend est demarre, puis reessaie."
+    : detail;
+}
+
 export function MarketingAgentWorkspace() {
   const [items, setItems] = useState<MarketingCampaign[]>([]);
   const [selected, setSelected] = useState<MarketingCampaign | null>(null);
@@ -146,6 +153,8 @@ export function MarketingAgentWorkspace() {
   const [productOptions, setProductOptions] = useState<ProductOption[]>([]);
   const [reviewProductSearch, setReviewProductSearch] = useState("");
   const [reviewProductOptions, setReviewProductOptions] = useState<ProductOption[]>([]);
+  const [reviewScoring, setReviewScoring] = useState(false);
+  const [reviewScoreError, setReviewScoreError] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -162,7 +171,7 @@ export function MarketingAgentWorkspace() {
         return result.items.find((item) => item.id === current.id) || current;
       });
     } catch (err) {
-      setError((err as Error).message);
+      setError(readableMarketingError(err));
     }
   };
 
@@ -218,6 +227,84 @@ export function MarketingAgentWorkspace() {
     reviewProductSearch,
   ]);
 
+  const reviewedProductIdsKey = selected?.product_ids.join(",") || "";
+
+  useEffect(() => {
+    if (
+      !selected
+      || selected.campaign_type !== "promotion"
+      || selected.selection_mode !== "manual"
+    ) {
+      setReviewScoring(false);
+      setReviewScoreError("");
+      return;
+    }
+
+    const expectedCountIsValid = selected.promotion_kind === "pack"
+      ? selected.product_ids.length >= 2
+      : selected.product_ids.length === 1;
+    if (!expectedCountIsValid) {
+      setReviewScoring(false);
+      setReviewScoreError("");
+      setSelected((current) => current
+        ? {
+            ...current,
+            selection_scores: current.selection_scores.filter((score) =>
+              current.product_ids.includes(score.product_id)),
+          }
+        : current);
+      return;
+    }
+
+    const campaignId = selected.id;
+    const promotionKind = selected.promotion_kind || "single_product";
+    const productIds = [...selected.product_ids];
+    const timer = window.setTimeout(() => {
+      setReviewScoring(true);
+      setReviewScoreError("");
+      api<PromotionSuggestion>(
+        "/api/admin/ai/marketing/promotions/suggest",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            promotion_kind: promotionKind,
+            selection_strategy: "balanced",
+            product_ids: productIds,
+          }),
+        },
+        true,
+      )
+        .then((result) => {
+          setSelected((current) => {
+            if (
+              !current
+              || current.id !== campaignId
+              || current.product_ids.join(",") !== productIds.join(",")
+            ) {
+              return current;
+            }
+            return { ...current, selection_scores: result.products };
+          });
+        })
+        .catch((err) => {
+          const detail = (err as Error).message;
+          setReviewScoreError(
+            detail === "Failed to fetch"
+              ? "Serveur indisponible. Reessaie dans quelques secondes."
+              : detail,
+          );
+        })
+        .finally(() => setReviewScoring(false));
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [
+    selected?.id,
+    selected?.campaign_type,
+    selected?.selection_mode,
+    selected?.promotion_kind,
+    reviewedProductIdsKey,
+  ]);
+
   const togglePromotionProduct = (productId: number) => {
     setForm((current) => {
       if (current.promotion_kind === "single_product") {
@@ -240,7 +327,12 @@ export function MarketingAgentWorkspace() {
       const productIds = current.product_ids.includes(productId)
         ? current.product_ids.filter((item) => item !== productId)
         : [...current.product_ids, productId];
-      return { ...current, product_ids: productIds };
+      return {
+        ...current,
+        product_ids: productIds,
+        selection_scores: current.selection_scores.filter((score) =>
+          productIds.includes(score.product_id)),
+      };
     });
   };
 
@@ -270,7 +362,7 @@ export function MarketingAgentWorkspace() {
           String(result.suggested_discount_percentage),
       }));
     } catch (err) {
-      setError((err as Error).message);
+      setError(readableMarketingError(err));
     } finally {
       setSuggesting(false);
     }
@@ -334,7 +426,7 @@ export function MarketingAgentWorkspace() {
       );
       await load();
     } catch (err) {
-      setError((err as Error).message);
+      setError(readableMarketingError(err));
     } finally {
       setGenerating(false);
     }
@@ -382,7 +474,7 @@ export function MarketingAgentWorkspace() {
       setMessage("Brouillon marketing enregistre.");
       await load();
     } catch (err) {
-      setError((err as Error).message);
+      setError(readableMarketingError(err));
     } finally {
       setSaving(false);
     }
@@ -407,7 +499,7 @@ export function MarketingAgentWorkspace() {
       );
       await load();
     } catch (err) {
-      setError((err as Error).message);
+      setError(readableMarketingError(err));
     } finally {
       setSaving(false);
     }
@@ -428,7 +520,7 @@ export function MarketingAgentWorkspace() {
       setMessage("Campagne archivee.");
       await load();
     } catch (err) {
-      setError((err as Error).message);
+      setError(readableMarketingError(err));
     } finally {
       setSaving(false);
     }
@@ -436,6 +528,11 @@ export function MarketingAgentWorkspace() {
 
   const updateSelected = (changes: Partial<MarketingCampaign>) =>
     setSelected((current) => current ? { ...current, ...changes } : current);
+
+  const selectedPromotionScores = selected
+    ? selected.selection_scores.filter((score) =>
+        selected.product_ids.includes(score.product_id))
+    : [];
 
   return (
     <div className="content-agent-workspace marketing-agent-workspace">
@@ -966,9 +1063,8 @@ export function MarketingAgentWorkspace() {
                                 <strong>
                                   {product.name || `Produit #${product.product_id}`}
                                 </strong>
-                                <small>
-                                  {product.brand || "NUTRIFIT"} · {product.stock} en stock
-                                </small>
+                                <small>{product.brand || "NUTRIFIT"}</small>
+                                <small>{product.stock} en stock</small>
                               </span>
                               <b>
                                 {product.price?.toFixed(2)} {product.currency}
@@ -982,11 +1078,21 @@ export function MarketingAgentWorkspace() {
                             ? " · minimum 2"
                             : " · un seul produit"}
                         </small>
+                        {reviewScoring && (
+                          <small className="promotion-score-status">
+                            Recalcul des scores en cours...
+                          </small>
+                        )}
+                        {reviewScoreError && (
+                          <small className="promotion-score-error">
+                            {reviewScoreError}
+                          </small>
+                        )}
                       </div>
                     ) : (
                       <div className="full-field automatic-product-summary">
                         <small>Produits choisis par Marketing Agent</small>
-                        {selected.selection_scores.map((product) => (
+                        {selectedPromotionScores.map((product) => (
                           <strong key={product.product_id}>{product.name}</strong>
                         ))}
                       </div>
@@ -1038,11 +1144,15 @@ export function MarketingAgentWorkspace() {
                     </label>
                   </div>
                   <div className="promotion-score-list">
-                    {selected.selection_scores.map((product) => (
+                    {selectedPromotionScores.map((product) => (
                       <article key={product.product_id}>
                         <strong>{product.name}</strong>
                         <span>{product.score}/100</span>
-                        <small>{product.reasons.join(" · ")}</small>
+                        <div className="promotion-score-reasons">
+                          {product.reasons.map((reason) => (
+                            <small key={reason}>{reason}</small>
+                          ))}
+                        </div>
                       </article>
                     ))}
                   </div>

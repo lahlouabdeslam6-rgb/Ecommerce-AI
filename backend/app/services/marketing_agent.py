@@ -283,7 +283,7 @@ class MarketingAgentService:
         data: MarketingCampaignUpdate,
     ) -> MarketingCampaignResponse:
         campaign = await self._get_or_404(campaign_id)
-        values = data.model_dump(exclude_unset=True, mode="json")
+        values = self._database_update_values(data)
         if not values:
             return MarketingCampaignResponse.model_validate(campaign)
         if "product_ids" in values or "promotion_kind" in values:
@@ -325,6 +325,14 @@ class MarketingAgentService:
             values["hashtags"] = self._clean_hashtags(values["hashtags"])
         updated = await self.repository.update(campaign, values)
         return MarketingCampaignResponse.model_validate(updated)
+
+    @staticmethod
+    def _database_update_values(
+        data: MarketingCampaignUpdate,
+    ) -> dict[str, Any]:
+        # JSON mode turns datetimes into strings. SQLAlchemy's SQLite DateTime
+        # columns require real Python datetime objects.
+        return data.model_dump(exclude_unset=True, mode="python")
 
     async def get(self, campaign_id: int) -> MarketingCampaignResponse:
         campaign = await self._get_or_404(campaign_id)
