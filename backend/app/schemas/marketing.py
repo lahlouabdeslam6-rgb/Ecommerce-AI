@@ -74,8 +74,8 @@ class ActivePromotionResponse(BaseModel):
 
 class MarketingGenerateRequest(BaseModel):
     campaign_type: CampaignType
-    topic: str = Field(min_length=3, max_length=300)
-    objective: str = Field(min_length=3, max_length=500)
+    topic: str = Field(default="", max_length=300)
+    objective: str = Field(default="", max_length=500)
     audience: str = Field(
         default="sportifs au Maroc",
         min_length=3,
@@ -107,9 +107,15 @@ class MarketingGenerateRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_promotion_selection(self) -> "MarketingGenerateRequest":
+        self.topic = self.topic.strip()
+        self.objective = self.objective.strip()
         if self.product_id and not self.product_ids:
             self.product_ids = [self.product_id]
         if self.campaign_type != "promotion":
+            if len(self.topic) < 3 or len(self.objective) < 3:
+                raise ValueError(
+                    "Topic and objective need at least three characters"
+                )
             return self
         self.promotion_kind = self.promotion_kind or "single_product"
         self.selection_mode = self.selection_mode or "automatic"

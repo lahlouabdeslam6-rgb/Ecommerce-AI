@@ -136,6 +136,45 @@ def test_manual_pack_accepts_more_than_four_products() -> None:
     assert request.product_ids == [10, 20, 30, 40, 50, 60]
 
 
+def test_promotion_allows_an_autonomous_empty_brief() -> None:
+    request = MarketingGenerateRequest(
+        campaign_type="promotion",
+        channels=["instagram"],
+        promotion_kind="single_product",
+        selection_mode="automatic",
+    )
+
+    assert request.topic == ""
+    assert request.objective == ""
+
+
+def test_marketing_agent_builds_the_autonomous_promotion_brief() -> None:
+    request = MarketingGenerateRequest(
+        campaign_type="promotion",
+        channels=["instagram"],
+        promotion_kind="pack",
+        selection_mode="automatic",
+    )
+    products = [
+        PromotionProductScore(
+            product_id=product_id,
+            name=f"Produit {product_id}",
+            price=100,
+            stock=20,
+            score=50,
+        )
+        for product_id in range(1, 7)
+    ]
+
+    topic, objective = MarketingAgentService._automatic_promotion_brief(
+        request,
+        products,
+    )
+
+    assert topic == "Promotion pack NUTRIFIT de 6 produits"
+    assert "offre pack" in objective
+
+
 def test_promotion_score_uses_sales_stock_and_momentum() -> None:
     products = [
         ProductResponse(

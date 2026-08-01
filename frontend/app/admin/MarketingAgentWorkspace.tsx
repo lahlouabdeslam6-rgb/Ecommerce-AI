@@ -439,28 +439,42 @@ export function MarketingAgentWorkspace() {
                 </select>
               </label>
               <label className="full-field">
-                Sujet
+                Sujet {form.campaign_type === "promotion" ? "(optionnel)" : ""}
                 <input
                   value={form.topic}
                   onChange={(event) =>
                     setForm({ ...form, topic: event.target.value })
                   }
-                  placeholder="Ex: campagne creatine pour la rentree"
-                  required
-                  minLength={3}
+                  placeholder={
+                    form.campaign_type === "promotion"
+                      ? "Laisser vide: Marketing Agent choisit le sujet"
+                      : "Ex: campagne creatine pour la rentree"
+                  }
+                  required={form.campaign_type !== "promotion"}
+                  minLength={form.campaign_type === "promotion" ? 0 : 3}
                 />
               </label>
               <label className="full-field">
-                Objectif
+                Objectif {form.campaign_type === "promotion" ? "(optionnel)" : ""}
                 <textarea
                   value={form.objective}
                   onChange={(event) =>
                     setForm({ ...form, objective: event.target.value })
                   }
-                  placeholder="Ex: faire decouvrir la selection et attirer vers le catalogue"
-                  required
-                  minLength={3}
+                  placeholder={
+                    form.campaign_type === "promotion"
+                      ? "Laisser vide: Marketing Agent construit l'objectif"
+                      : "Ex: faire decouvrir la selection et attirer vers le catalogue"
+                  }
+                  required={form.campaign_type !== "promotion"}
+                  minLength={form.campaign_type === "promotion" ? 0 : 3}
                 />
+                {form.campaign_type === "promotion" && (
+                  <small className="muted">
+                    Mode autonome: laisse ces deux champs vides et Marketing
+                    Agent prepare le brief complet depuis les produits choisis.
+                  </small>
+                )}
               </label>
               <label>
                 Audience
@@ -694,7 +708,9 @@ export function MarketingAgentWorkspace() {
             <button className="button button-ai" disabled={generating}>
               {generating
                 ? "Marketing Agent travaille..."
-                : "Generer la campagne"}
+                : form.campaign_type === "promotion"
+                  ? "Generer toute la promotion avec AI"
+                  : "Generer la campagne"}
             </button>
           </form>
 

@@ -201,8 +201,14 @@ class MarketingAgentService:
                 f"Proposition de reduction de {discount:g}% soumise "
                 "a validation admin."
             )
+        topic, objective = self._automatic_promotion_brief(
+            data,
+            suggestion.products,
+        )
         prepared = data.model_copy(
             update={
+                "topic": topic,
+                "objective": objective,
                 "product_id": selected_ids[0] if selected_ids else None,
                 "product_ids": selected_ids,
                 "discount_percentage": discount,
@@ -210,6 +216,40 @@ class MarketingAgentService:
             }
         )
         return prepared, suggestion.products
+
+    @staticmethod
+    def _automatic_promotion_brief(
+        data: MarketingGenerateRequest,
+        products: list[PromotionProductScore],
+    ) -> tuple[str, str]:
+        if data.topic and data.objective:
+            return data.topic, data.objective
+
+        if (data.promotion_kind or "single_product") == "pack":
+            selection = (
+                f"pack NUTRIFIT de {len(products)} produits"
+                if len(products) > 4
+                else "pack " + ", ".join(product.name for product in products)
+            )
+            default_objective = (
+                "Presenter une offre pack claire et premium, expliquer la "
+                "complementarite des produits et orienter les clients vers "
+                "les fiches produits sans promesse medicale."
+            )
+        else:
+            product_name = (
+                products[0].name if products else "produit NUTRIFIT"
+            )
+            selection = product_name
+            default_objective = (
+                "Faire decouvrir ce produit, valoriser ses informations "
+                "verifiees et orienter les clients vers sa fiche sans "
+                "promesse medicale."
+            )
+
+        topic = data.topic or f"Promotion {selection}"
+        objective = data.objective or default_objective
+        return topic[:300], objective[:500]
 
     async def list(
         self,
