@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from datetime import UTC, datetime
 from typing import Any
@@ -156,6 +158,28 @@ class MarketingRepository:
             .limit(1)
         )
         return result.scalar_one_or_none()
+
+    async def active_promotions(self, *, now: datetime) -> list[AIMarketingCampaign]:
+        result = await self.session.execute(
+            select(AIMarketingCampaign)
+            .where(
+                AIMarketingCampaign.campaign_type == "promotion",
+                AIMarketingCampaign.status == "approved",
+                or_(
+                    AIMarketingCampaign.starts_at.is_(None),
+                    AIMarketingCampaign.starts_at <= now,
+                ),
+                or_(
+                    AIMarketingCampaign.ends_at.is_(None),
+                    AIMarketingCampaign.ends_at >= now,
+                ),
+            )
+            .order_by(
+                AIMarketingCampaign.approved_at.desc(),
+                AIMarketingCampaign.id.desc(),
+            )
+        )
+        return list(result.scalars().all())
 
     async def approve(
         self,

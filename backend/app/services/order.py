@@ -9,6 +9,7 @@ from app.repositories.cart import CartRepository
 from app.repositories.order import OrderRepository
 from app.repositories.operations import OperationsRepository
 from app.repositories.product import ProductRepository
+from app.services.pack import PackService
 from app.schemas.order import (
     CheckoutRequest,
     GuestCheckoutRequest,
@@ -36,6 +37,7 @@ class OrderService:
         self.order_repository = OrderRepository(session)
         self.operations = OperationsRepository(session)
         self.product_repository = ProductRepository()
+        self.pack_service = PackService(session)
 
     async def checkout(
         self,
@@ -44,6 +46,7 @@ class OrderService:
         data: CheckoutRequest,
     ) -> OrderResponse:
         cart_items = await self.cart_repository.list_items(user_id)
+        pack_items = await self.cart_repository.list_pack_items(user_id)
         order = await self._checkout_items(
             user_id=user_id,
             email=email,
@@ -51,6 +54,7 @@ class OrderService:
             requested_items=[
                 (item.product_id, item.quantity) for item in cart_items
             ],
+            requested_packs=[(item.pack_id, item.quantity) for item in pack_items],
         )
         await self.cart_repository.clear(user_id, commit=False)
         await self.session.commit()
@@ -70,7 +74,10 @@ class OrderService:
             ),
             data=data,
             requested_items=[
-                (item.product_id, item.quantity) for item in data.items
+                (item.product_id, item.quantity) for item in data.items if item.product_id is not None
+            ],
+            requested_packs=[
+                (item.pack_id, item.quantity) for item in data.items if item.pack_id is not None
             ],
             guest_token_hash=self._token_hash(tracking_token),
         )
@@ -108,6 +115,7 @@ class OrderService:
         email: str,
         data: CheckoutRequest,
         requested_items: list[tuple[int, int]],
+        requested_packs: list[tuple[int, int]] | None = None,
         guest_token_hash: str | None = None,
     ) -> OrderResponse:
         if data.payment_method == "card" and (
@@ -119,7 +127,8 @@ class OrderService:
                 status.HTTP_400_BAD_REQUEST,
                 "Card payment could not be authorized",
             )
-        if not requested_items:
+        requested_packs = requested_packs or []
+        if not requested_items and not requested_packs:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Le panier est vide")
 
         quantities: dict[int, int] = {}
@@ -129,13 +138,28 @@ class OrderService:
                 99,
             )
 
+        pack_quantities: dict[int, int] = {}
+        for pack_id, quantity in requested_packs:
+            pack_quantities[pack_id] = min(pack_quantities.get(pack_id, 0) + quantity, 20)
+
+        pack_responses = {}
+        component_quantities: dict[int, int] = dict(quantities)
+        for pack_id, quantity in pack_quantities.items():
+            pack = await self.pack_service.get(pack_id, public=True)
+            if pack.stock < quantity:
+                raise HTTPException(status.HTTP_409_CONFLICT, f"Stock insuffisant pour le pack {pack_id}")
+            pack_responses[pack_id] = pack
+            for component in pack.products:
+                product_id = component.product.product_id
+                component_quantities[product_id] = component_quantities.get(product_id, 0) + component.quantity * quantity
+
         products = await self.product_repository.get_many_by_ids(
-            list(quantities)
+            list(component_quantities)
         )
         order_items: list[dict[str, object]] = []
         subtotal = 0.0
 
-        for product_id, quantity in quantities.items():
+        for product_id, quantity in component_quantities.items():
             product = products.get(product_id)
             if product is None or not product.get("is_active"):
                 raise HTTPException(
@@ -147,11 +171,16 @@ class OrderService:
                     status.HTTP_409_CONFLICT,
                     f"Stock insuffisant pour le produit {product_id}",
                 )
+            if product_id not in quantities:
+                continue
+            quantity = quantities[product_id]
             unit_price = float(product.get("price") or 0)
             line_subtotal = round(unit_price * quantity, 2)
             images = product.get("images") or []
             order_items.append(
                 {
+                    "item_type": "product",
+                    "pack_id": None,
                     "product_id": product_id,
                     "product_name": product.get("name") or "Unnamed product",
                     "brand": product.get("brand"),
@@ -163,9 +192,27 @@ class OrderService:
             )
             subtotal += line_subtotal
 
+        for pack_id, quantity in pack_quantities.items():
+            pack = pack_responses[pack_id]
+            line_subtotal = round(pack.promotional_price * quantity, 2)
+            order_items.append(
+                {
+                    "item_type": "pack",
+                    "product_id": 0,
+                    "pack_id": pack.id,
+                    "product_name": pack.name,
+                    "brand": "Pack NUTRIFIT",
+                    "image_url": pack.main_image_url,
+                    "unit_price": pack.promotional_price,
+                    "quantity": quantity,
+                    "subtotal": line_subtotal,
+                }
+            )
+            subtotal += line_subtotal
+
         reserved: list[tuple[int, int]] = []
         try:
-            for product_id, quantity in quantities.items():
+            for product_id, quantity in component_quantities.items():
                 if not await self.product_repository.reserve_stock(
                     product_id, quantity
                 ):
@@ -195,12 +242,11 @@ class OrderService:
                     data.payment_token if data.payment_method == "card" else None
                 ),
             )
-            for item in order_items:
-                before = int(products[int(item["product_id"])].get("stock") or 0)
-                quantity = int(item["quantity"])
+            for product_id, quantity in component_quantities.items():
+                before = int(products[product_id].get("stock") or 0)
                 self.operations.add_stock_movement(
-                    product_id=int(item["product_id"]),
-                    product_name=str(item["product_name"]),
+                    product_id=product_id,
+                    product_name=str(products[product_id].get("name") or f"Produit #{product_id}"),
                     movement_type="order_reserved",
                     quantity=-quantity,
                     stock_before=before,
@@ -351,16 +397,24 @@ class OrderService:
 
     async def _restore_order_stock(self, order: Order) -> None:
         for item in order.items:
-            product = await self.product_repository.get_by_product_id(item.product_id)
-            before = int(product.get("stock") or 0) if product else 0
-            await self.product_repository.restore_stock(item.product_id, item.quantity)
-            self.operations.add_stock_movement(
-                product_id=item.product_id,
-                product_name=item.product_name,
-                movement_type="order_restored",
-                quantity=item.quantity,
-                stock_before=before,
-                stock_after=before + item.quantity,
-                reference_type="order",
-                reference_id=order.id,
-            )
+            components = [(item.product_id, item.product_name, item.quantity)]
+            if item.item_type == "pack" and item.pack_id:
+                pack = await self.pack_service.get(item.pack_id)
+                components = [
+                    (component.product.product_id, component.product.name or "Produit", component.quantity * item.quantity)
+                    for component in pack.products
+                ]
+            for product_id, product_name, quantity in components:
+                product = await self.product_repository.get_by_product_id(product_id)
+                before = int(product.get("stock") or 0) if product else 0
+                await self.product_repository.restore_stock(product_id, quantity)
+                self.operations.add_stock_movement(
+                    product_id=product_id,
+                    product_name=product_name,
+                    movement_type="order_restored",
+                    quantity=quantity,
+                    stock_before=before,
+                    stock_after=before + quantity,
+                    reference_type="order",
+                    reference_id=order.id,
+                )

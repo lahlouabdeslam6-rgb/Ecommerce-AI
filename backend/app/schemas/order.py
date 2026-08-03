@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 
 class CheckoutRequest(BaseModel):
@@ -16,8 +16,17 @@ class CheckoutRequest(BaseModel):
 
 
 class GuestCartItemInput(BaseModel):
-    product_id: int = Field(gt=0)
+    product_id: int | None = Field(default=None, gt=0)
+    pack_id: int | None = Field(default=None, gt=0)
     quantity: int = Field(ge=1, le=99)
+
+    @model_validator(mode="after")
+    def one_item_type(self):
+        if (self.product_id is None) == (self.pack_id is None):
+            raise ValueError("Indique un produit ou un pack")
+        if self.pack_id is not None and self.quantity > 20:
+            raise ValueError("Maximum 20 packs par ligne")
+        return self
 
 
 class GuestCheckoutRequest(CheckoutRequest):
@@ -34,6 +43,8 @@ class OrderItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     product_id: int
+    pack_id: int | None = None
+    item_type: str = "product"
     product_name: str
     brand: str | None
     image_url: str | None

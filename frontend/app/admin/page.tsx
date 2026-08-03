@@ -11,6 +11,7 @@ import { DeliveryAgentWorkspace } from "./DeliveryAgentWorkspace";
 import { AdminTicketWorkspace } from "./AdminTicketWorkspace";
 import { AnalyticsAgentWorkspace } from "./AnalyticsAgentWorkspace";
 import { MarketingAgentWorkspace } from "./MarketingAgentWorkspace";
+import { PackAdminWorkspace } from "./PackAdminWorkspace";
 import { OrchestratorWorkspace } from "./OrchestratorWorkspace";
 import { SafetyAgentWorkspace } from "./SafetyAgentWorkspace";
 import { SEOAgentWorkspace } from "./SEOAgentWorkspace";
@@ -64,8 +65,8 @@ export default function AdminPage() {
 
   const load = async () => {
     if (user?.role !== "admin") return;
-    try {
-      const [d, p, o, u, s, a] = await Promise.all([
+    setError("");
+    const requests = await Promise.allSettled([
         api<Dashboard>("/api/admin/dashboard", {}, true),
         api<ProductList>(
           `/api/products/manage?page_size=100${
@@ -89,21 +90,33 @@ export default function AdminPage() {
         api<UserList>("/api/admin/support-users?page_size=100", {}, true),
         api<AuditLogList>("/api/admin/audit-logs?page_size=100", {}, true),
       ]);
-      let orderData = o;
+    const sectionNames = ["vue d'ensemble", "produits", "commandes", "utilisateurs", "equipe support", "historique"];
+    const failures = requests.flatMap((result, index) => result.status === "rejected" ? [sectionNames[index]] : []);
+    const [d, p, o, u, s, a] = requests;
+    if (d.status === "fulfilled") setDashboard(d.value);
+    if (p.status === "fulfilled") setProducts(p.value);
+    if (u.status === "fulfilled") setUsers(u.value);
+    if (s.status === "fulfilled") setSupportUsers(s.value);
+    if (a.status === "fulfilled") setAuditLogs(a.value);
+    if (o.status === "fulfilled") {
+      let orderData = o.value;
       if (
         Number.isInteger(requestedOrderId) &&
         requestedOrderId > 0 &&
-        !o.items.some((item) => item.id === requestedOrderId)
+        !o.value.items.some((item) => item.id === requestedOrderId)
       ) {
-        const requestedOrder = await api<Order>(
-          `/api/admin/orders/${requestedOrderId}`,
-          {},
-          true,
-        );
-        orderData = { ...o, items: [requestedOrder, ...o.items] };
+        try {
+          const requestedOrder = await api<Order>(`/api/admin/orders/${requestedOrderId}`, {}, true);
+          orderData = { ...o.value, items: [requestedOrder, ...o.value.items] };
+        } catch {
+          failures.push(`commande #${requestedOrderId}`);
+        }
       }
-      setDashboard(d); setProducts(p); setOrders(orderData); setUsers(u); setSupportUsers(s); setAuditLogs(a);
-    } catch (err) { setError((err as Error).message); }
+      setOrders(orderData);
+    }
+    if (failures.length) {
+      setError(`Certaines sections sont temporairement indisponibles : ${failures.join(", ")}. Les autres restent utilisables.`);
+    }
   };
 
   useEffect(() => { void load(); }, [user, requestedOrderId]);
@@ -406,13 +419,15 @@ export default function AdminPage() {
     }
   };
 
-  return <Protected admin><section className="admin-shell"><aside className="admin-sidebar"><p className="kicker">Administration</p><h1>Pilotage</h1>{[["dashboard", "Vue d'ensemble"], ["products", "Produits"], ["orchestrator", "AI Orchestrator"], ["content-seo", "Contenu & SEO"], ["business-intelligence", "Business Intelligence"], ["support-delivery", "Support & livraison"], ["marketing", "Marketing AI"], ["safety", "Safety AI"], ["orders", "Commandes"], ["support-users", "Equipe support"], ["users", "Utilisateurs"], ["audit", "Historique"]].map(([value, label]) => <button key={value} className={tab === value || (value === "support-users" && tab === "support-editor") ? "active" : ""} onClick={() => setTab(value)}>{label}</button>)}</aside><div className="admin-content">{message && <div className="alert alert-success">{message}</div>}{error && <div className="alert alert-error">{error}</div>}
+  return <Protected admin><section className="admin-shell"><aside className="admin-sidebar"><p className="kicker">Administration</p><h1>Pilotage</h1>{[["dashboard", "Vue d'ensemble"], ["products", "Produits"], ["packs", "Packs"], ["orchestrator", "AI Orchestrator"], ["content-seo", "Contenu & SEO"], ["business-intelligence", "Business Intelligence"], ["support-delivery", "Support & livraison"], ["marketing", "Marketing AI"], ["safety", "Safety AI"], ["orders", "Commandes"], ["support-users", "Equipe support"], ["users", "Utilisateurs"], ["audit", "Historique"]].map(([value, label]) => <button key={value} className={tab === value || (value === "support-users" && tab === "support-editor") ? "active" : ""} onClick={() => setTab(value)}>{label}</button>)}</aside><div className="admin-content">{message && <div className="alert alert-success">{message}</div>}{error && <div className="alert alert-error">{error}</div>}
 
     {tab === "dashboard" && <><Title kicker="Aujourd'hui" title="Vue d'ensemble" />{dashboard ? <div className="stats-grid"><Stat label="Produits" value={dashboard.products} /><Stat label="Produits actifs" value={dashboard.active_products} /><Stat label="Stock faible" value={dashboard.low_stock_products} accent /><Stat label="Utilisateurs" value={dashboard.users} /><Stat label="Equipe support" value={supportUsers?.total || 0} /><Stat label="Commandes" value={dashboard.orders} /><Stat label="En attente" value={dashboard.pending_orders} accent /><Stat label="Revenu COD" value={money(dashboard.revenue_mad)} /></div> : <div className="page-loading">Chargement...</div>}</>}
 
     {tab === "products" && <><Title kicker="Catalogue" title="Produits" action={<button className="button button-small" onClick={newProduct}>Ajouter un produit</button>} /><form className="panel admin-search-bar" onSubmit={searchProducts}><label>Rechercher un produit<input value={productSearch} onChange={(event) => setProductSearch(event.target.value)} placeholder="Nom ou marque du produit" /></label><button className="button button-small">Rechercher</button>{productSearch && <button type="button" className="text-link" onClick={() => { setProductSearch(""); void api<ProductList>("/api/products/manage?page_size=100", {}, true).then(setProducts); }}>Effacer</button>}</form>{!products?.items.length ? <div className="empty-state"><h3>Aucun produit trouvé</h3></div> : <div className="data-table"><div className="table-row table-head"><span>Produit</span><span>Prix</span><span>Stock</span><span>Statut</span><span /></div>{products.items.map((product) => <div className="table-row" key={product.product_id}><span><strong>{product.name}</strong><small>{product.brand}</small></span><span>{money(product.price || 0)}</span><span>{product.stock}</span><span><i className={product.is_active ? "dot active" : "dot"} />{product.is_active ? "Actif" : "Masque"}</span><span><button className="text-link" onClick={() => editProduct(product)}>Modifier</button></span></div>)}</div>}</>}
 
     {tab === "product-editor" && <><Title kicker="Catalogue" title={editingId ? `Modifier #${editingId}` : "Nouveau produit"} action={<button className="text-link" onClick={() => { setPendingMedia([]); setTab("products"); }}>Retour</button>} /><form className="panel product-editor" onSubmit={saveProduct}><div className="form-grid"><label>Nom<input value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} required /></label><label>Marque<input value={productForm.brand} onChange={(e) => setProductForm({ ...productForm, brand: e.target.value })} required /></label><label>Categorie<input value={productForm.category} onChange={(e) => setProductForm({ ...productForm, category: e.target.value })} /></label><label>Prix de vente MAD<input type="number" step="0.01" min="0" value={productForm.price} onChange={(e) => setProductForm({ ...productForm, price: Number(e.target.value) })} required /></label><label>Prix d&apos;achat MAD (admin)<input type="number" step="0.01" min="0" value={productForm.cost_price ?? ""} onChange={(e) => setProductForm({ ...productForm, cost_price: e.target.value ? Number(e.target.value) : null })} /><small>Utilise uniquement pour calculer la marge des promotions.</small></label><label>Stock<input type="number" min="0" value={productForm.stock} onChange={(e) => setProductForm({ ...productForm, stock: Number(e.target.value) })} required /></label><label className="check-filter"><input type="checkbox" checked={productForm.is_active} onChange={(e) => setProductForm({ ...productForm, is_active: e.target.checked })} /><span>Produit actif</span></label><label className="full-field">Description<textarea value={productForm.description} onChange={(e) => setProductForm({ ...productForm, description: e.target.value })} /></label>{editingId && <div className="full-field ai-product-actions"><button type="button" className="button button-ai" onClick={generateProductSuggestion} disabled={generatingAI || applyingAI}>{generatingAI ? "Product Agent travaille..." : "Optimiser avec Product Agent"}</button><small>L'AI prepare une proposition. Aucune information ne change sans ta validation.</small></div>}{aiSuggestion && <section className="full-field ai-product-panel"><div className="ai-product-heading"><div><span>PRODUCT AGENT</span><strong>Proposition a valider</strong></div><small>{aiSuggestion.model}{aiSuggestion.cached ? " · cache" : ""}</small></div><div className="form-grid"><label>Categorie proposee<input value={aiSuggestion.category} onChange={(e) => setAiSuggestion((current) => current ? { ...current, category: e.target.value } : current)} /></label><label>Titre SEO<input value={aiSuggestion.seo_title} maxLength={70} onChange={(e) => setAiSuggestion((current) => current ? { ...current, seo_title: e.target.value } : current)} /></label><label className="full-field">Description produit<textarea value={aiSuggestion.description} maxLength={1500} onChange={(e) => setAiSuggestion((current) => current ? { ...current, description: e.target.value } : current)} /></label><label className="full-field">Description SEO<textarea value={aiSuggestion.seo_description} maxLength={180} onChange={(e) => setAiSuggestion((current) => current ? { ...current, seo_description: e.target.value } : current)} /></label><label>Mots-cles SEO<input value={aiSuggestion.seo_keywords.join(", ")} onChange={(e) => setAiSuggestion((current) => current ? { ...current, seo_keywords: splitTerms(e.target.value) } : current)} /></label><label>Tags<input value={aiSuggestion.tags.join(", ")} onChange={(e) => setAiSuggestion((current) => current ? { ...current, tags: splitTerms(e.target.value) } : current)} /></label></div><div className="ai-review-actions"><button type="button" className="button" onClick={applyProductSuggestion} disabled={applyingAI}>{applyingAI ? "Application..." : "Valider et appliquer"}</button><button type="button" className="text-link" onClick={() => setAiSuggestion(null)} disabled={applyingAI}>Ignorer</button></div></section>}<label className="full-field">Ajouter des photos ou vidéos<input type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime,video/x-m4v" multiple onChange={uploadMedia} /><small>Jusqu&apos;à 8 fichiers par envoi. Photo: 5 MB. Vidéo: 50 MB.</small></label>{!editingId && pendingMedia.length > 0 && <div className="full-field pending-media-note"><strong>{pendingMedia.length} média(s) sélectionné(s)</strong><small>Ces fichiers seront ajoutés automatiquement après la création du produit.</small></div>}{editingProduct && editingId && <div className="full-field"><strong>Médias actuels</strong><ProductImageManager product={editingProduct} onChange={setEditingProduct} onError={setError} /></div>}</div><div className="editor-actions"><button className="button">Enregistrer</button>{editingId && <button type="button" className="button button-danger" onClick={deleteProduct}>Supprimer</button>}</div></form></>}
+
+    {tab === "packs" && <PackAdminWorkspace />}
 
     {tab === "content-seo" && <><ContentAgentWorkspace /><SEOAgentWorkspace /></>}
 

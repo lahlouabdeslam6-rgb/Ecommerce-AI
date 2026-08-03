@@ -35,6 +35,9 @@ class AIMarketingCampaign(Base):
         DateTime(timezone=True), nullable=True, index=True
     )
     offer_details: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    pack_cover_image_url: Mapped[str | None] = mapped_column(
+        String(1000), nullable=True
+    )
     channels_json: Mapped[str] = mapped_column(Text, default="[]")
     campaign_title: Mapped[str] = mapped_column(String(180))
     headline: Mapped[str] = mapped_column(String(220))

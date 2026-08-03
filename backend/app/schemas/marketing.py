@@ -225,6 +225,7 @@ class MarketingCampaignResponse(BaseModel):
     starts_at: datetime | None
     ends_at: datetime | None
     offer_details: str | None
+    pack_cover_image_url: str | None = None
     campaign_title: str
     headline: str
     core_message: str

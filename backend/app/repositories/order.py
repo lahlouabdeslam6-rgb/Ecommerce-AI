@@ -111,6 +111,7 @@ class OrderRepository:
             .where(
                 Order.user_id == user_id,
                 Order.order_status != "cancelled",
+                OrderItem.product_id > 0,
             )
             .order_by(Order.created_at.desc(), OrderItem.id.desc())
             .limit(limit)

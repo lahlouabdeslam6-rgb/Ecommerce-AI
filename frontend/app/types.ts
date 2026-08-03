@@ -64,7 +64,9 @@ export type RecommendationResponse = {
 };
 
 export type CartItem = {
-  product_id: number;
+  item_type: "product" | "pack";
+  product_id: number | null;
+  pack_id: number | null;
   name: string;
   brand: string | null;
   image_url: string | null;
@@ -75,6 +77,37 @@ export type CartItem = {
   stock: number;
   is_available: boolean;
 };
+
+export type PackProduct = {
+  product: Product;
+  quantity: number;
+};
+
+export type Pack = {
+  id: number;
+  name: string;
+  slug: string;
+  description: string;
+  highlights: string[];
+  main_image_url: string | null;
+  gallery: string[];
+  products: PackProduct[];
+  regular_price: number;
+  discount_percentage: number;
+  promotional_price: number;
+  currency: string;
+  stock: number;
+  is_available: boolean;
+  is_active: boolean;
+  source: "admin" | "marketing";
+  campaign_id: number | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PackList = { items: Pack[]; total: number };
 
 export type Cart = {
   items: CartItem[];
@@ -106,6 +139,8 @@ export type Order = {
   updated_at: string;
   items: Array<{
     product_id: number;
+    pack_id: number | null;
+    item_type: "product" | "pack";
     product_name: string;
     brand: string | null;
     image_url: string | null;

@@ -113,6 +113,24 @@ def test_marketing_approval_requires_selected_channel_content() -> None:
     assert "email" in str(error.value.detail)
 
 
+@pytest.mark.asyncio
+async def test_pack_approval_requires_main_cover() -> None:
+    campaign = AIMarketingCampaign(
+        campaign_type="promotion",
+        promotion_kind="pack",
+        product_id=10,
+        product_ids_json="[10, 20]",
+        pack_cover_image_url=None,
+    )
+    service = MarketingAgentService(AsyncMock())
+
+    with pytest.raises(HTTPException) as error:
+        await service._validate_promotion(campaign)
+
+    assert error.value.status_code == 409
+    assert "photo principale" in str(error.value.detail).lower()
+
+
 def test_manual_pack_requires_at_least_two_products() -> None:
     with pytest.raises(ValueError):
         MarketingGenerateRequest(

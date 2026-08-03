@@ -97,10 +97,10 @@ export function Header() {
           <div className="commerce-nav-inner">
             {navigation}
             <div className="category-shortcuts" aria-label="Catégories populaires">
-              <Link href="/?search=whey#catalogue">Protéines</Link>
-              <Link href="/?search=creatine#catalogue">Créatine</Link>
-              <Link href="/?search=vitamin#catalogue">Vitamines</Link>
-              <Link href="/?search=omega#catalogue">Bien-être</Link>
+              <Link href="/?category=proteines#catalogue">Protéines</Link>
+              <Link href="/?category=creatine#catalogue">Créatine</Link>
+              <Link href="/?category=vitamines#catalogue">Vitamines</Link>
+              <Link href="/?category=bien-etre#catalogue">Bien-être</Link>
             </div>
           </div>
         </div>

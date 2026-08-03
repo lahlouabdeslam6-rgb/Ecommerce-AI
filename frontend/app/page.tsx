@@ -5,9 +5,10 @@ import { useSearchParams } from "next/navigation";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import { ProductRail } from "./components/ProductRail";
+import { PackRail } from "./components/PackRail";
 import { SiteFooter } from "./components/SiteFooter";
 import { api } from "./lib/api";
-import type { Product, ProductList } from "./types";
+import type { Pack, PackList, Product, ProductList } from "./types";
 
 type PublishedContent = {
   id: number;
@@ -100,6 +101,7 @@ function promotionCriteria(
 export default function Home() {
   const searchParams = useSearchParams();
   const requestedSearch = searchParams.get("search") || "";
+  const requestedCategory = searchParams.get("category") || "";
   const [products, setProducts] = useState<ProductList | null>(null);
   const [bestSellers, setBestSellers] = useState<Product[]>([]);
   const [promotionProducts, setPromotionProducts] = useState<Product[]>([]);
@@ -116,8 +118,12 @@ export default function Home() {
   const [error, setError] = useState("");
   const [heroContent, setHeroContent] = useState<PublishedContent | null>(null);
   const [promotion, setPromotion] = useState<PublishedContent | null>(null);
-  const [marketingPromotion, setMarketingPromotion] =
-    useState<ActiveMarketingPromotion | null>(null);
+  const [marketingPromotions, setMarketingPromotions] = useState<ActiveMarketingPromotion[]>([]);
+  const [packs, setPacks] = useState<Pack[]>([]);
+  const singleMarketingPromotions = marketingPromotions.filter(
+    (item) => item.promotion_kind === "single_product",
+  );
+  const marketingPromotion = singleMarketingPromotions[0] || null;
 
   const query = useMemo(() => {
     const params = new URLSearchParams({ page: String(page), page_size: "16" });
@@ -171,7 +177,8 @@ export default function Home() {
     api<Product[]>("/api/products/best-sellers?limit=12").then(setBestSellers).catch(() => undefined);
     api<PublishedContent | null>("/api/content/published?content_type=homepage_hero").then(setHeroContent).catch(() => undefined);
     api<PublishedContent | null>("/api/content/published?content_type=promotion").then(setPromotion).catch(() => undefined);
-    api<ActiveMarketingPromotion | null>("/api/marketing/promotions/active").then(setMarketingPromotion).catch(() => undefined);
+    api<ActiveMarketingPromotion[]>("/api/marketing/promotions/active/all").then(setMarketingPromotions).catch(() => undefined);
+    api<PackList>("/api/packs").then((result) => setPacks(result.items)).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -180,8 +187,29 @@ export default function Home() {
   }, [requestedSearch]);
 
   useEffect(() => {
-    if (marketingPromotion) {
-      setPromotionProducts(marketingPromotion.products);
+    if (!requestedCategory || !filters.categories.length) return;
+    const terms: Record<string, string[]> = {
+      proteines: ["protein", "whey"],
+      creatine: ["creatine"],
+      vitamines: ["vitamin"],
+      "bien-etre": ["fatty", "botanical", "mineral", "omega", "wellness"],
+    };
+    const categoryTerms = terms[normalizeText(requestedCategory)] || [normalizeText(requestedCategory)];
+    const match = filters.categories.find((item) =>
+      categoryTerms.some((term) => normalizeText(item).includes(term)),
+    );
+    setSearch("");
+    setCategory(match || "");
+    setPage(1);
+    window.requestAnimationFrame(() =>
+      document.getElementById("catalogue")?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
+  }, [requestedCategory, filters.categories]);
+
+  useEffect(() => {
+    const activeSingle = marketingPromotions.find((item) => item.promotion_kind === "single_product");
+    if (activeSingle) {
+      setPromotionProducts(activeSingle.products);
       return;
     }
     if (!promotion) {
@@ -202,7 +230,7 @@ export default function Home() {
     api<ProductList>(`/api/products?${params.toString()}`)
       .then((result) => setPromotionProducts(result.items))
       .catch(() => setPromotionProducts([]));
-  }, [filters, marketingPromotion, promotion]);
+  }, [filters, marketingPromotions, promotion]);
 
   useEffect(() => {
     setProducts(null);
@@ -212,6 +240,17 @@ export default function Home() {
     }, 220);
     return () => window.clearTimeout(timer);
   }, [query]);
+
+  useEffect(() => {
+    if (!requestedCategory || !products) return;
+    const timer = window.setTimeout(() => {
+      document.getElementById("catalogue")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [requestedCategory, products, packs.length, marketingPromotions.length]);
 
   return (
     <>
@@ -241,6 +280,18 @@ export default function Home() {
           />
         </div>
       )}
+
+      {singleMarketingPromotions.slice(1).map((item) => (
+        <section className="content-promotion shell" key={item.id}>
+          <div>
+            <p className="kicker">Offre NUTRIFIT</p>
+            <h2>{item.title}</h2>
+            <strong>{item.headline}</strong>
+            <p>{item.message}</p>
+          </div>
+          <a href="#catalogue" className="button">{item.cta_label || "Voir la selection"}</a>
+        </section>
+      ))}
 
       {marketingPromotion ? (
         <>
@@ -300,6 +351,8 @@ export default function Home() {
           )}
         </>
       )}
+
+      <PackRail packs={packs} />
 
       <section className="catalogue shell" id="catalogue">
         <div className="catalogue-heading">

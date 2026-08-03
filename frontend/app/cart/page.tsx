@@ -9,7 +9,9 @@ import {
   clearGuestCart,
   getGuestCart,
   removeGuestProduct,
+  removeGuestPack,
   updateGuestQuantity,
+  updateGuestPackQuantity,
 } from "../lib/guest-cart";
 import type { Cart } from "../types";
 
@@ -32,11 +34,13 @@ export default function CartPage() {
       const guestCart = getGuestCart();
       for (const item of guestCart.items) {
         await api<Cart>(
-          "/api/cart/items",
+          item.item_type === "pack" ? "/api/cart/packs" : "/api/cart/items",
           {
             method: "POST",
             body: JSON.stringify({
-              product_id: item.product_id,
+              ...(item.item_type === "pack"
+                ? { pack_id: item.pack_id }
+                : { product_id: item.product_id }),
               quantity: item.quantity,
             }),
           },
@@ -54,15 +58,15 @@ export default function CartPage() {
     if (!loading) void load();
   }, [loading, user]);
 
-  const update = async (productId: number, quantity: number) => {
+  const update = async (itemType: "product" | "pack", itemId: number, quantity: number) => {
     try {
       if (!user) {
-        publishCart(updateGuestQuantity(productId, quantity));
+        publishCart(itemType === "pack" ? updateGuestPackQuantity(itemId, quantity) : updateGuestQuantity(itemId, quantity));
         return;
       }
       publishCart(
         await api<Cart>(
-          `/api/cart/items/${productId}`,
+          itemType === "pack" ? `/api/cart/packs/${itemId}` : `/api/cart/items/${itemId}`,
           {
             method: "PATCH",
             body: JSON.stringify({ quantity }),
@@ -75,15 +79,15 @@ export default function CartPage() {
     }
   };
 
-  const remove = async (productId: number) => {
+  const remove = async (itemType: "product" | "pack", itemId: number) => {
     try {
       if (!user) {
-        publishCart(removeGuestProduct(productId));
+        publishCart(itemType === "pack" ? removeGuestPack(itemId) : removeGuestProduct(itemId));
         return;
       }
       publishCart(
         await api<Cart>(
-          `/api/cart/items/${productId}`,
+          itemType === "pack" ? `/api/cart/packs/${itemId}` : `/api/cart/items/${itemId}`,
           { method: "DELETE" },
           true,
         ),
@@ -122,8 +126,9 @@ export default function CartPage() {
               <div className="cart-items">
                 {cart.items.map((item) => {
                   const image = assetUrl(item.image_url);
+                  const itemId = item.item_type === "pack" ? item.pack_id : item.product_id;
                   return (
-                    <article className="cart-item" key={item.product_id}>
+                    <article className="cart-item" key={`${item.item_type}-${itemId}`}>
                       <div className="cart-thumb">
                         {image ? (
                           <img src={image} alt={item.name} />
@@ -133,7 +138,7 @@ export default function CartPage() {
                       </div>
                       <div className="cart-info">
                         <p className="eyebrow">{item.brand}</p>
-                        <Link href={`/products/${item.product_id}`}>
+                        <Link href={item.item_type === "pack" ? `/packs/${item.pack_id}` : `/products/${item.product_id}`}>
                           {item.name}
                         </Link>
                         <small>
@@ -144,7 +149,7 @@ export default function CartPage() {
                         <button
                           disabled={item.quantity <= 1}
                           onClick={() =>
-                            update(item.product_id, item.quantity - 1)
+                            itemId && update(item.item_type, itemId, item.quantity - 1)
                           }
                         >
                           -
@@ -153,7 +158,7 @@ export default function CartPage() {
                         <button
                           disabled={item.quantity >= item.stock}
                           onClick={() =>
-                            update(item.product_id, item.quantity + 1)
+                            itemId && update(item.item_type, itemId, item.quantity + 1)
                           }
                         >
                           +
@@ -162,7 +167,7 @@ export default function CartPage() {
                       <strong>{money(item.subtotal, item.currency)}</strong>
                       <button
                         className="remove-button"
-                        onClick={() => remove(item.product_id)}
+                        onClick={() => itemId && remove(item.item_type, itemId)}
                       >
                         Retirer
                       </button>

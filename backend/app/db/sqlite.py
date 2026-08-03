@@ -54,6 +54,20 @@ async def initialize_sqlite() -> None:
                 await connection.exec_driver_sql(
                     f"ALTER TABLE orders ADD COLUMN {name} {definition}"
                 )
+        order_item_columns = {
+            row[1]
+            for row in (
+                await connection.exec_driver_sql("PRAGMA table_info(order_items)")
+            ).fetchall()
+        }
+        for name, definition in {
+            "pack_id": "INTEGER REFERENCES packs(id) ON DELETE SET NULL",
+            "item_type": "VARCHAR(20) NOT NULL DEFAULT 'product'",
+        }.items():
+            if name not in order_item_columns:
+                await connection.exec_driver_sql(
+                    f"ALTER TABLE order_items ADD COLUMN {name} {definition}"
+                )
         user_columns = {
             row[1]
             for row in (

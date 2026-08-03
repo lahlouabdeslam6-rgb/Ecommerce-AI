@@ -135,6 +135,7 @@ services:
     volumes:
       - sqlite_data:/app/data
       - product_images:/app/app/static/uploads/products
+      - pack_images:/app/app/static/uploads/packs
     depends_on:
       mongo:
         condition: service_healthy
@@ -175,6 +176,7 @@ volumes:
   mongo_data:
   sqlite_data:
   product_images:
+  pack_images:
   redis_data:
   qdrant_data:
   ollama_data:

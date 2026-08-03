@@ -3,16 +3,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.cart import CartRepository
 from app.repositories.product import ProductRepository
+from app.services.pack import PackService
 from app.schemas.cart import CartItemResponse, CartResponse
 
 
 class CartService:
     def __init__(self, session: AsyncSession) -> None:
+        self.session = session
         self.cart_repository = CartRepository(session)
         self.product_repository = ProductRepository()
+        self.pack_service = PackService(session)
 
     async def get_cart(self, user_id: int) -> CartResponse:
         cart_items = await self.cart_repository.list_items(user_id)
+        pack_items = await self.cart_repository.list_pack_items(user_id)
         products = await self.product_repository.get_many_by_ids(
             [item.product_id for item in cart_items]
         )
@@ -24,6 +28,7 @@ class CartService:
             if product is None:
                 response_items.append(
                     CartItemResponse(
+                        item_type="product",
                         product_id=item.product_id,
                         name="Unavailable product",
                         unit_price=0,
@@ -44,6 +49,7 @@ class CartService:
             images = product.get("images") or []
             response_items.append(
                 CartItemResponse(
+                    item_type="product",
                     product_id=item.product_id,
                     name=product.get("name") or "Unnamed product",
                     brand=product.get("brand"),
@@ -58,9 +64,35 @@ class CartService:
             )
             subtotal += line_subtotal
 
+        for item in pack_items:
+            try:
+                pack = await self.pack_service.get(item.pack_id)
+            except HTTPException:
+                pack = None
+            if pack is None:
+                response_items.append(
+                    CartItemResponse(
+                        item_type="pack", pack_id=item.pack_id, name="Pack indisponible",
+                        unit_price=0, currency="MAD", quantity=item.quantity,
+                        subtotal=0, stock=0, is_available=False,
+                    )
+                )
+                continue
+            line_subtotal = round(pack.promotional_price * item.quantity, 2)
+            response_items.append(
+                CartItemResponse(
+                    item_type="pack", pack_id=pack.id, name=pack.name,
+                    brand="Pack NUTRIFIT", image_url=pack.main_image_url,
+                    unit_price=pack.promotional_price, currency=pack.currency,
+                    quantity=item.quantity, subtotal=line_subtotal, stock=pack.stock,
+                    is_available=pack.is_available and pack.stock >= item.quantity,
+                )
+            )
+            subtotal += line_subtotal
+
         return CartResponse(
             items=response_items,
-            item_count=sum(item.quantity for item in cart_items),
+            item_count=sum(item.quantity for item in [*cart_items, *pack_items]),
             subtotal=round(subtotal, 2),
         )
 
@@ -101,6 +133,29 @@ class CartService:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Cart item not found")
         return await self.get_cart(user_id)
 
+    async def add_pack(self, user_id: int, pack_id: int, quantity: int) -> CartResponse:
+        existing = await self.cart_repository.get_pack_item(user_id, pack_id)
+        new_quantity = quantity + (existing.quantity if existing else 0)
+        await self._validate_pack(pack_id, new_quantity)
+        await self.cart_repository.set_pack_quantity(
+            user_id=user_id, pack_id=pack_id, quantity=new_quantity
+        )
+        return await self.get_cart(user_id)
+
+    async def update_pack(self, user_id: int, pack_id: int, quantity: int) -> CartResponse:
+        if await self.cart_repository.get_pack_item(user_id, pack_id) is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Pack absent du panier")
+        await self._validate_pack(pack_id, quantity)
+        await self.cart_repository.set_pack_quantity(
+            user_id=user_id, pack_id=pack_id, quantity=quantity
+        )
+        return await self.get_cart(user_id)
+
+    async def remove_pack(self, user_id: int, pack_id: int) -> CartResponse:
+        if not await self.cart_repository.remove_pack_item(user_id, pack_id):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Pack absent du panier")
+        return await self.get_cart(user_id)
+
     async def clear(self, user_id: int) -> None:
         await self.cart_repository.clear(user_id)
 
@@ -112,3 +167,8 @@ class CartService:
             raise HTTPException(status.HTTP_409_CONFLICT, "Product has no price")
         if int(product.get("stock") or 0) < quantity:
             raise HTTPException(status.HTTP_409_CONFLICT, "Insufficient stock")
+
+    async def _validate_pack(self, pack_id: int, quantity: int) -> None:
+        pack = await self.pack_service.get(pack_id, public=True)
+        if pack.stock < quantity:
+            raise HTTPException(status.HTTP_409_CONFLICT, "Stock insuffisant pour ce pack")

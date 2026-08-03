@@ -46,11 +46,13 @@ export default function CheckoutPage() {
           const guestCart = getGuestCart();
           for (const item of guestCart.items) {
             await api<Cart>(
-              "/api/cart/items",
+              item.item_type === "pack" ? "/api/cart/packs" : "/api/cart/items",
               {
                 method: "POST",
                 body: JSON.stringify({
-                  product_id: item.product_id,
+                  ...(item.item_type === "pack"
+                    ? { pack_id: item.pack_id }
+                    : { product_id: item.product_id }),
                   quantity: item.quantity,
                 }),
               },
@@ -143,7 +145,9 @@ export default function CheckoutPage() {
               ...shipping,
               ...payment,
               items: cart.items.map((item) => ({
-                product_id: item.product_id,
+                ...(item.item_type === "pack"
+                  ? { pack_id: item.pack_id }
+                  : { product_id: item.product_id }),
                 quantity: item.quantity,
               })),
             }),

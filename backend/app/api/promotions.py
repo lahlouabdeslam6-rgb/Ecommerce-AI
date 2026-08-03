@@ -13,15 +13,7 @@ from app.services.product import ProductService
 router = APIRouter(prefix="/marketing/promotions", tags=["Promotions"])
 
 
-@router.get("/active", response_model=ActivePromotionResponse | None)
-async def active_promotion(
-    session: Annotated[AsyncSession, Depends(get_sqlite_session)],
-) -> ActivePromotionResponse | None:
-    campaign = await MarketingRepository(session).latest_active_promotion(
-        now=datetime.now(UTC)
-    )
-    if campaign is None:
-        return None
+async def _promotion_response(campaign) -> ActivePromotionResponse | None:
     product_ids = campaign.product_ids or (
         [campaign.product_id] if campaign.product_id else []
     )
@@ -34,10 +26,7 @@ async def active_promotion(
     minimum = 2 if campaign.promotion_kind == "pack" else 1
     if len(products) < minimum:
         return None
-    regular_total = round(
-        sum(float(product.price or 0) for product in products),
-        2,
-    )
+    regular_total = round(sum(float(product.price or 0) for product in products), 2)
     discount = float(campaign.discount_percentage or 0)
     return ActivePromotionResponse(
         id=campaign.id,
@@ -49,11 +38,29 @@ async def active_promotion(
         products=products,
         regular_total=regular_total,
         discount_percentage=discount,
-        promotional_total=round(
-            regular_total * (1 - discount / 100),
-            2,
-        ),
+        promotional_total=round(regular_total * (1 - discount / 100), 2),
         currency=products[0].currency,
         starts_at=campaign.starts_at,
         ends_at=campaign.ends_at,
     )
+
+
+@router.get("/active/all", response_model=list[ActivePromotionResponse])
+async def active_promotions(
+    session: Annotated[AsyncSession, Depends(get_sqlite_session)],
+) -> list[ActivePromotionResponse]:
+    campaigns = await MarketingRepository(session).active_promotions(now=datetime.now(UTC))
+    responses = [await _promotion_response(campaign) for campaign in campaigns]
+    return [response for response in responses if response is not None]
+
+
+@router.get("/active", response_model=ActivePromotionResponse | None)
+async def active_promotion(
+    session: Annotated[AsyncSession, Depends(get_sqlite_session)],
+) -> ActivePromotionResponse | None:
+    campaign = await MarketingRepository(session).latest_active_promotion(
+        now=datetime.now(UTC)
+    )
+    if campaign is None:
+        return None
+    return await _promotion_response(campaign)

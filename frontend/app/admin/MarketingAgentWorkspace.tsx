@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { api } from "../lib/api";
+import { api, assetUrl } from "../lib/api";
 
 type MarketingCampaign = {
   id: number;
@@ -20,6 +20,7 @@ type MarketingCampaign = {
   starts_at: string | null;
   ends_at: string | null;
   offer_details: string | null;
+  pack_cover_image_url: string | null;
   campaign_title: string;
   headline: string;
   core_message: string;
@@ -155,6 +156,8 @@ export function MarketingAgentWorkspace() {
   const [reviewProductOptions, setReviewProductOptions] = useState<ProductOption[]>([]);
   const [reviewScoring, setReviewScoring] = useState(false);
   const [reviewScoreError, setReviewScoreError] = useState("");
+  const [packCoverUploading, setPackCoverUploading] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -480,8 +483,42 @@ export function MarketingAgentWorkspace() {
     }
   };
 
+  const uploadPackCover = async (files: FileList | null) => {
+    const file = files?.[0];
+    if (!selected || !file) return;
+    setPackCoverUploading(true);
+    setError("");
+    setMessage("");
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const updated = await api<MarketingCampaign>(
+        `/api/admin/ai/marketing/campaigns/${selected.id}/pack-cover`,
+        { method: "POST", body },
+        true,
+      );
+      setSelected(updated);
+      setItems((current) =>
+        current.map((item) => item.id === updated.id ? updated : item)
+      );
+      setMessage("Photo principale du pack enregistree.");
+    } catch (err) {
+      setError(readableMarketingError(err));
+    } finally {
+      setPackCoverUploading(false);
+    }
+  };
+
   const approve = async () => {
     if (!selected) return;
+    if (
+      selected.campaign_type === "promotion"
+      && selected.promotion_kind === "pack"
+      && !selected.pack_cover_image_url
+    ) {
+      setError("Ajoute la photo principale du pack avant de valider la campagne.");
+      return;
+    }
     setSaving(true);
     setError("");
     setMessage("");
@@ -533,6 +570,12 @@ export function MarketingAgentWorkspace() {
     ? selected.selection_scores.filter((score) =>
         selected.product_ids.includes(score.product_id))
     : [];
+  const selectedRegularTotal = selectedPromotionScores.reduce(
+    (total, product) => total + Number(product.price || 0),
+    0,
+  );
+  const selectedDiscount = Number(selected?.discount_percentage || 0);
+  const selectedPromotionalPrice = selectedRegularTotal * (1 - selectedDiscount / 100);
 
   return (
     <div className="content-agent-workspace marketing-agent-workspace">
@@ -1143,6 +1186,47 @@ export function MarketingAgentWorkspace() {
                       />
                     </label>
                   </div>
+                  {selected.promotion_kind === "pack" && (
+                    <section className="pack-cover-admin marketing-pack-cover">
+                      <div>
+                        <strong>Photo principale du pack</strong>
+                        <small>
+                          Cette photo presente le pack complet dans la boutique.
+                          Elle est obligatoire avant la validation.
+                        </small>
+                      </div>
+                      <label>
+                        <span className="pack-cover-preview">
+                          {selected.pack_cover_image_url ? (
+                            <img
+                              src={assetUrl(selected.pack_cover_image_url) || ""}
+                              alt="Photo principale du pack"
+                            />
+                          ) : (
+                            <b>N</b>
+                          )}
+                        </span>
+                        <span>
+                          <strong>
+                            {packCoverUploading
+                              ? "Envoi en cours..."
+                              : selected.pack_cover_image_url
+                                ? "Remplacer la photo du pack"
+                                : "Choisir la photo du pack"}
+                          </strong>
+                          <small>JPG, PNG ou WebP, 5 MB maximum.</small>
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          disabled={packCoverUploading}
+                          onChange={(event) =>
+                            void uploadPackCover(event.target.files)
+                          }
+                        />
+                      </label>
+                    </section>
+                  )}
                   <div className="promotion-score-list">
                     {selectedPromotionScores.map((product) => (
                       <article key={product.product_id}>
@@ -1315,6 +1399,15 @@ export function MarketingAgentWorkspace() {
                 />
               </label>
               <div className="content-review-actions">
+                {selected.campaign_type === "promotion" && selected.promotion_kind === "pack" && (
+                  <button
+                    type="button"
+                    className="button button-secondary"
+                    onClick={() => setPreviewOpen((current) => !current)}
+                  >
+                    {previewOpen ? "Fermer l'apercu" : "Previsualiser dans la boutique"}
+                  </button>
+                )}
                 <button
                   type="button"
                   className="button button-secondary"
@@ -1327,7 +1420,7 @@ export function MarketingAgentWorkspace() {
                   type="button"
                   className="button"
                   onClick={approve}
-                  disabled={saving}
+                  disabled={saving || packCoverUploading}
                 >
                   {saving ? "Traitement..." : "Valider la campagne"}
                 </button>
@@ -1340,6 +1433,34 @@ export function MarketingAgentWorkspace() {
                   Archiver
                 </button>
               </div>
+              {previewOpen && selected.campaign_type === "promotion" && selected.promotion_kind === "pack" && (
+                <section className="marketing-store-preview" aria-label="Apercu du pack dans la boutique">
+                  <div className="marketing-store-preview-image">
+                    {selected.pack_cover_image_url ? (
+                      <img src={assetUrl(selected.pack_cover_image_url) || ""} alt="Apercu de la photo du pack" />
+                    ) : (
+                      <span>N</span>
+                    )}
+                    <b>-{selectedDiscount}%</b>
+                  </div>
+                  <div className="marketing-store-preview-copy">
+                    <small>APERCU BOUTIQUE - NON PUBLIE</small>
+                    <h3>{selected.campaign_title}</h3>
+                    <p>{selected.core_message}</p>
+                    <div className="marketing-store-preview-products">
+                      {selectedPromotionScores.map((product) => (
+                        <span key={product.product_id}>{product.name}</span>
+                      ))}
+                    </div>
+                    <div className="marketing-store-preview-price">
+                      <strong>{selectedPromotionalPrice.toFixed(2)} MAD</strong>
+                      <del>{selectedRegularTotal.toFixed(2)} MAD</del>
+                      <span>Economie {(selectedRegularTotal - selectedPromotionalPrice).toFixed(2)} MAD</span>
+                    </div>
+                    <button type="button" className="button" disabled>Ajouter le pack au panier</button>
+                  </div>
+                </section>
+              )}
             </>
           )}
         </section>

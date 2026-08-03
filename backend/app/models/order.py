@@ -67,6 +67,10 @@ class OrderItem(Base):
         index=True,
     )
     product_id: Mapped[int] = mapped_column(Integer, index=True)
+    pack_id: Mapped[int | None] = mapped_column(
+        ForeignKey("packs.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
+    item_type: Mapped[str] = mapped_column(String(20), default="product", index=True)
     product_name: Mapped[str] = mapped_column(String(240))
     brand: Mapped[str | None] = mapped_column(String(120), nullable=True)
     image_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)

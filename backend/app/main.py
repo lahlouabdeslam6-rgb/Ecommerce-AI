@@ -23,6 +23,7 @@ from app.api.marketing import router as marketing_router
 from app.api.safety import router as safety_router
 from app.api.seo import router as seo_router
 from app.api.orders import router as orders_router
+from app.api.packs import router as packs_router
 from app.api.operations import router as operations_router
 from app.api.order_verification import router as order_verification_router
 from app.api.products import router as products_router
@@ -45,8 +46,9 @@ from app.db.ai_infrastructure import (
     connect_ai_infrastructure,
     disconnect_ai_infrastructure,
 )
-from app.db.sqlite import check_sqlite, disconnect_sqlite, initialize_sqlite
+from app.db.sqlite import SqliteSession, check_sqlite, disconnect_sqlite, initialize_sqlite
 from app.repositories.product import ProductRepository
+from app.services.pack import PackService
 
 
 @asynccontextmanager
@@ -55,6 +57,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     await connect_ai_infrastructure()
     await initialize_sqlite()
     await ProductRepository().ensure_indexes()
+    async with SqliteSession() as session:
+        await PackService(session).sync_approved_marketing_packs()
     try:
         yield
     finally:
@@ -146,6 +150,7 @@ app.include_router(marketing_router, prefix="/api")
 app.include_router(safety_router, prefix="/api")
 app.include_router(seo_router, prefix="/api")
 app.include_router(orders_router, prefix="/api")
+app.include_router(packs_router, prefix="/api")
 app.include_router(operations_router, prefix="/api")
 app.include_router(order_verification_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")

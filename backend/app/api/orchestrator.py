@@ -32,6 +32,19 @@ async def execute(
     try:
         service = OrchestratorService(session=session, user=user)
         result = await service.execute(payload)
+    except HTTPException:
+        raise
+    except Exception:
+        await session.rollback()
+        logger.exception("Orchestrator execution failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="AI Orchestrator is temporarily unavailable",
+        )
+
+    # The orchestrator is proposal-only. A temporary audit storage problem must
+    # never turn a valid, read-only AI answer into an HTTP 500 response.
+    try:
         OperationsRepository(session).add_audit(
             actor_id=user.id,
             actor_role=user.role,
@@ -43,16 +56,10 @@ async def execute(
             },
         )
         await session.commit()
-        return result
-    except HTTPException:
-        raise
-    except Exception as exc:
+    except Exception:
         await session.rollback()
-        logger.exception("Orchestrator execution failed")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="AI Orchestrator is temporarily unavailable",
-        )
+        logger.warning("Orchestrator audit could not be stored", exc_info=True)
+    return result
 
 
 @router.get("/history", response_model=OrchestratorHistoryListResponse)

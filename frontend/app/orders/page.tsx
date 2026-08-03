@@ -189,7 +189,7 @@ export default function OrdersPage() {
               </div>
               <div className="order-lines">
                 {order.items.map((item) => (
-                  <div key={item.product_id}>
+                  <div key={`${item.item_type}-${item.pack_id || item.product_id}`}>
                     <span>
                       {item.quantity} × {item.product_name}
                     </span>

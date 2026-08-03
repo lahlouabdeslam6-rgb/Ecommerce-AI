@@ -338,6 +338,23 @@ class MarketingAgentService:
         campaign = await self._get_or_404(campaign_id)
         return MarketingCampaignResponse.model_validate(campaign)
 
+    async def set_pack_cover(
+        self,
+        campaign_id: int,
+        image_url: str,
+    ) -> MarketingCampaignResponse:
+        campaign = await self._get_or_404(campaign_id)
+        if campaign.campaign_type != "promotion" or campaign.promotion_kind != "pack":
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "La photo principale est reservee aux promotions de type pack",
+            )
+        updated = await self.repository.update(
+            campaign,
+            {"pack_cover_image_url": image_url},
+        )
+        return MarketingCampaignResponse.model_validate(updated)
+
     async def approve(
         self,
         campaign_id: int,
@@ -372,6 +389,11 @@ class MarketingAgentService:
             raise HTTPException(
                 status.HTTP_409_CONFLICT,
                 "Choose at least two products before pack activation",
+            )
+        if kind == "pack" and not campaign.pack_cover_image_url:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "Ajoute la photo principale du pack avant de valider la campagne",
             )
         scoring = PromotionScoringService(self.session)
         suggestion = await scoring.suggest(
